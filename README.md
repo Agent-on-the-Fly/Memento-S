@@ -2,9 +2,6 @@
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
-![CLI](https://img.shields.io/badge/Interface-CLI-blue?style=for-the-badge)
 [![Website](https://img.shields.io/badge/Website-skills.memento.run-0ea5e9?style=for-the-badge)](https://skills.memento.run/)
 
 **An intelligent agent system with self-evolving skills, multi-step workflows, and a focused CLI interface.**
