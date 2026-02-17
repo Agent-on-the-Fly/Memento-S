@@ -34,12 +34,12 @@ def _is_likely_format_error(output: str) -> bool:
         return False
     needles = [
         "Invalid skill plan (refused)",
-        "ERR: plan contained no ops",
+        "ERR: plan contained no tool_calls",
         "ERR: exceeded max_rounds",
         "Invalid plan: received type=code",
-        "Missing ops",
+        "Missing tool_calls",
+        "tool_call missing required function.name",
         "missing required key 'type'",
-        "op missing required key 'type'",
         "KeyError: 'type'",
         "Unknown operation type",
         "unknown operation type",
@@ -101,8 +101,9 @@ def optimize_skill_with_creator(
         "Update the existing skill below to fix the failure. "
         "Keep the skill name unchanged, and keep the response format unchanged. "
         "Make minimal, precise edits.\n\n"
-        "Goal: prevent ops/format errors (especially missing op.type) and ensure the skill reliably executes.\n"
-        "- Ensure SKILL.md clearly specifies the JSON schema and that every op has a string key `type`.\n"
+        "Goal: prevent tool_calls/format errors and ensure the skill reliably executes.\n"
+        "- Ensure SKILL.md clearly specifies OpenAI-style `tool_calls` (type=function, function.name, function.arguments JSON).\n"
+        "- Ensure delegated calls include valid function names and valid JSON arguments.\n"
         "- Keep this as a SKILL.md-only skill.\n"
         "- Do NOT add task-specific hacks; fix the general mechanism.\n\n"
         f"Skill name to update (MUST match): {skill_name}\n\n"
@@ -532,6 +533,17 @@ Return ONLY the summary, no meta-commentary."""
                     "skill_name": None,
                     "status": "done",
                     "reason": reason,
+                    "is_final": True,
+                }, result
+                self._debug_timing("workflow_total", t_workflow)
+                return
+
+            if next_action == "none":
+                yield {
+                    "step_num": step_num,
+                    "skill_name": None,
+                    "status": "no_match",
+                    "reason": next_decision.get("reason", ""),
                     "is_final": True,
                 }, result
                 self._debug_timing("workflow_total", t_workflow)

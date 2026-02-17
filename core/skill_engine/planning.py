@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from typing import Any
 
 from core.config import DEBUG
 from core.llm import openrouter_messages
@@ -37,12 +39,13 @@ def ask_for_plan(
     system_prompt = (
         "Follow the loaded SKILL.md exactly and return JSON only (no markdown). "
         'If no external actions are needed, return {"final":"..."}. '
-        'If actions are needed, return {"ops":[...]} using bridge-friendly op types only: '
-        "call_skill, run_command/shell, filesystem ops (read_file/write_file/edit_file/replace_text/append_file/"
+        'If actions are needed, return OpenAI-style {"tool_calls":[...]} (type=function, function.name, '
+        "function.arguments JSON string) using bridge-friendly tool names only: "
+        "call_skill, run_command/shell, filesystem tools (read_file/write_file/edit_file/replace_text/append_file/"
         "list_directory/directory_tree/create_directory/mkdir/move_file/copy_file/delete_file/file_info/"
-        "search_files/file_exists), web ops (web_search/search/google_search/fetch/fetch_url/fetch_markdown), "
-        "and uv ops (check/install/list). "
-        "For call_skill include 'skill' and 'plan' (or 'ops'). "
+        "search_files/file_exists), web tools (web_search/search/google_search/fetch/fetch_url/fetch_markdown), "
+        "and uv tools (check/install/list). "
+        "For call_skill include 'skill' and 'plan' (or 'tool_calls'). "
         "For bundled skill resources, commands may use relative paths like scripts/... or references/...; "
         "the runtime resolves them against the active skill directory. "
         "For intermediate/generated files without an explicit user path, prefer placing them under workspace/."
@@ -69,17 +72,17 @@ def ask_for_plan(
     ):
         retry_schema = (
             "Return ONLY a single JSON object with keys: "
-            "action, skills_dir, skill_name, ops, notes. "
+            "action, skills_dir, skill_name, tool_calls, notes. "
             "No other keys. No prose.\n\n"
             "Schema:\n"
             "{\n"
             '  "action": "create" | "update",\n'
             '  "skills_dir": "skills",\n'
             '  "skill_name": "skill-name",\n'
-            '  "ops": [\n'
-            '    { "type": "mkdir", "path": "references" },\n'
-            '    { "type": "write_file", "path": "SKILL.md", "content": "...", "overwrite": true },\n'
-            '    { "type": "write_file", "path": "scripts/run.py", "content": "...", "overwrite": true }\n'
+            '  "tool_calls": [\n'
+            '    { "id":"call_1","type":"function","function":{"name":"mkdir","arguments":"{\\"path\\":\\"references\\"}"} },\n'
+            '    { "id":"call_2","type":"function","function":{"name":"write_file","arguments":"{\\"path\\":\\"SKILL.md\\",\\"content\\":\\"...\\",\\"overwrite\\":true}"} },\n'
+            '    { "id":"call_3","type":"function","function":{"name":"write_file","arguments":"{\\"path\\":\\"scripts/run.py\\",\\"content\\":\\"...\\",\\"overwrite\\":true}"} }\n'
             "  ],\n"
             '  "notes": "short human-readable summary"\n'
             "}\n"
@@ -115,7 +118,7 @@ def ask_for_plan(
                 "_handled": True,
                 "result": (
                     "Invalid skill plan (refused). Expected JSON with non-empty "
-                    "`ops` or `tool_calls`, or a final answer like {\"final\":\"...\"} "
+                    "`tool_calls` (legacy `ops` also accepted), or a final answer like {\"final\":\"...\"} "
                     "(and not `type=code`). "
                     f"Got keys: {keys}"
                 ),
@@ -133,7 +136,7 @@ def ask_for_plan(
 # ---------------------------------------------------------------------------
 
 def validate_plan_for_skill(plan: dict, skill_name: str) -> bool:
-    """Validate that a plan has the correct format (ops array or final answer)."""
+    """Validate that a plan has the correct format (tool_calls array or final answer)."""
     if not isinstance(plan, dict) or not plan:
         return False
 
@@ -148,57 +151,71 @@ def validate_plan_for_skill(plan: dict, skill_name: str) -> bool:
     if isinstance(final, str) and final.strip():
         return True
 
-    # All skills must use ops format
+    # All skills should use tool_calls (ops is accepted for back-compat).
+    tool_calls = plan.get("tool_calls")
+    has_tool_calls = isinstance(tool_calls, list) and len(tool_calls) > 0
     ops = plan.get("ops")
     has_ops = isinstance(ops, list) and len(ops) > 0
 
     if skill_name == "skill-creator":
-        return bool(plan.get("action") and plan.get("skill_name") and has_ops)
+        return bool(plan.get("action") and plan.get("skill_name") and (has_tool_calls or has_ops))
 
-    return has_ops
+    return has_tool_calls or has_ops
 
 
 def build_strict_schema_prompt(skill_name: str) -> str:
     if skill_name == "skill-creator":
         return (
-            "Return ONLY a single JSON object with keys: action, skills_dir, skill_name, ops, notes.\n"
+            "Return ONLY a single JSON object with keys: action, skills_dir, skill_name, tool_calls, notes.\n"
             "No other keys."
         )
     if skill_name == "filesystem":
         return (
             "Return ONLY a single JSON object. No markdown. No prose.\n"
-            "CRITICAL: Use the `ops` format with `type` key. NEVER use mcp_call, mcp_tool, or tool_calls.\n\n"
+            "CRITICAL: Use OpenAI-style `tool_calls` format. Never use mcp_call or mcp_tool wrappers.\n\n"
             "CORRECT format:\n"
-            '{"ops": [{"type": "directory_tree", "path": "/path", "depth": 3}]}\n'
-            '{"ops": [{"type": "read_file", "path": "/path/to/file"}]}\n'
-            '{"ops": [{"type": "edit_file", "path": "/path", "old_text": "...", "new_text": "..."}]}\n\n'
+            '{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"directory_tree","arguments":"{\\"path\\":\\"/path\\",\\"depth\\":3}"}}]}\n'
+            '{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"read_file","arguments":"{\\"path\\":\\"/path/to/file\\"}"}}]}\n'
+            '{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"edit_file","arguments":"{\\"path\\":\\"/path\\",\\"old_text\\":\\"...\\",\\"new_text\\":\\"...\\"}"}}]}\n\n'
             "WRONG (do not use):\n"
-            '{"ops": [{"op": "mcp_call", ...}]}  <- WRONG!\n'
-            '{"ops": [{"op": "mcp_tool", ...}]}  <- WRONG!\n'
+            '{"tool_calls":[{"type":"mcp_call", ...}]}  <- WRONG!\n'
+            '{"tool_calls":[{"type":"mcp_tool", ...}]}  <- WRONG!\n'
         )
     if skill_name == "terminal":
         return (
             "Return ONLY a single JSON object. No markdown. No prose.\n"
-            "IMPORTANT: Use the `ops` format as defined in SKILL.md, NOT tool_calls.\n"
+            "IMPORTANT: Use OpenAI-style `tool_calls` format as defined in SKILL.md.\n"
             "Example:\n"
-            '{"ops": [{"type": "run_command", "command": "git status", "working_dir": "/path"}]}\n'
-            "Do NOT use tool_calls format. Use ops only.\n"
+            '{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"run_command","arguments":"{\\"command\\":\\"git status\\",\\"working_dir\\":\\"/path\\"}"}}]}\n'
+            "Do NOT return wrapper formats like mcp_call/mcp_tool.\n"
         )
     return (
         "Return ONLY a single JSON object. No markdown. No prose.\n"
         "Rules:\n"
-        "- Do NOT include keys: thoughts, type, code, tool_calls, mcp.\n"
+        "- Do NOT include keys: thoughts, type, code, mcp.\n"
         "- Must include:\n"
-        '  - "ops": [...] (non-empty array)\n'
+        '  - "tool_calls": [...] (non-empty array)\n'
         '  - OR a final answer: {"final":"..."}\n'
-        "- Each op in ops must have a `type` key.\n"
+        "- Each tool call should be OpenAI-style with type=function + function.name + function.arguments.\n"
         "- For bundled skill resources, prefer relative paths like scripts/... and references/...\n"
         "- Follow the loaded SKILL.md schema exactly.\n"
     )
 
 
+def _tool_call(name: str, arguments: dict[str, Any], *, call_id: str) -> dict[str, Any]:
+    """Build one OpenAI-style function tool call."""
+    return {
+        "id": call_id,
+        "type": "function",
+        "function": {
+            "name": name,
+            "arguments": json.dumps(arguments, ensure_ascii=False),
+        },
+    }
+
+
 def normalize_skill_creator_plan(plan: dict) -> dict:
-    """Back-compat: convert \"files\" payloads into skill-creator ops when action is missing."""
+    """Back-compat: convert \"files\" payloads into skill-creator tool_calls when action is missing."""
     if plan.get("action"):
         return plan
 
@@ -219,19 +236,25 @@ def normalize_skill_creator_plan(plan: dict) -> dict:
             "action": "create",
             "skills_dir": "skills",
             "skill_name": skill_name,
-            "ops": [
-                {
-                    "type": "write_file",
-                    "path": "SKILL.md",
-                    "content": skill_md,
-                    "overwrite": True,
-                },
-                {
-                    "type": "write_file",
-                    "path": "scripts/run.py",
-                    "content": script_stub,
-                    "overwrite": True,
-                },
+            "tool_calls": [
+                _tool_call(
+                    "write_file",
+                    {
+                        "path": "SKILL.md",
+                        "content": skill_md,
+                        "overwrite": True,
+                    },
+                    call_id="call_1",
+                ),
+                _tool_call(
+                    "write_file",
+                    {
+                        "path": "scripts/run.py",
+                        "content": script_stub,
+                        "overwrite": True,
+                    },
+                    call_id="call_2",
+                ),
             ],
             "notes": "normalized from SKILL.md payload",
         }
@@ -245,7 +268,8 @@ def normalize_skill_creator_plan(plan: dict) -> dict:
     if isinstance(first_path, str) and "/" in first_path:
         skill_name = first_path.split("/", 1)[0].strip() or None
 
-    ops = []
+    write_calls: list[dict[str, Any]] = []
+    write_paths: list[str] = []
     for f in files:
         path = f.get("path")
         content = f.get("content", "")
@@ -254,35 +278,42 @@ def normalize_skill_creator_plan(plan: dict) -> dict:
         rel = path
         if skill_name and path.startswith(f"{skill_name}/"):
             rel = path[len(skill_name) + 1:]
-        ops.append(
-            {
-                "type": "write_file",
-                "path": rel,
-                "content": content,
-                "overwrite": True,
-            }
+        write_paths.append(rel)
+        write_calls.append(
+            _tool_call(
+                "write_file",
+                {
+                    "path": rel,
+                    "content": content,
+                    "overwrite": True,
+                },
+                call_id=f"call_{len(write_calls) + 1}",
+            )
         )
     # Enforce at least one script for operational skills.
-    if not any(op["path"].startswith("scripts/") for op in ops):
-        ops.append(
-            {
-                "type": "write_file",
-                "path": "scripts/run.py",
-                "content": (
-                    "def main():\n"
-                    "    raise SystemExit('Not implemented: fill in script logic')\n"
-                    "\n"
-                    "if __name__ == '__main__':\n"
-                    "    main()\n"
-                ),
-                "overwrite": True,
-            }
+    if not any(path.startswith("scripts/") for path in write_paths):
+        write_calls.append(
+            _tool_call(
+                "write_file",
+                {
+                    "path": "scripts/run.py",
+                    "content": (
+                        "def main():\n"
+                        "    raise SystemExit('Not implemented: fill in script logic')\n"
+                        "\n"
+                        "if __name__ == '__main__':\n"
+                        "    main()\n"
+                    ),
+                    "overwrite": True,
+                },
+                call_id=f"call_{len(write_calls) + 1}",
+            )
         )
 
     return {
         "action": "create",
         "skills_dir": "skills",
         "skill_name": skill_name or "new-skill",
-        "ops": ops,
+        "tool_calls": write_calls,
         "notes": "normalized from files payload",
     }

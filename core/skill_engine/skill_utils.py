@@ -13,22 +13,22 @@ class SkillExecutionError(RuntimeError):
 def _normalize_plan(ops_or_plan: Any) -> dict:
     """
     Accept either:
-      - list[dict] operations -> {"ops": [...]}
+      - list[dict] tool calls/ops -> {"tool_calls": [...]}
       - a full plan dict -> plan
-      - a single op dict -> {"ops": [op]}
+      - a single tool call/op dict -> {"tool_calls": [op]}
     """
     if isinstance(ops_or_plan, list):
-        return {"ops": ops_or_plan}
+        return {"tool_calls": ops_or_plan}
     if isinstance(ops_or_plan, dict):
-        if "ops" in ops_or_plan:
+        if "tool_calls" in ops_or_plan or "ops" in ops_or_plan:
             return dict(ops_or_plan)
-        if "type" in ops_or_plan:
-            return {"ops": [ops_or_plan]}
+        if "type" in ops_or_plan or "function" in ops_or_plan or "name" in ops_or_plan:
+            return {"tool_calls": [ops_or_plan]}
         # Some skills accept shorthand at the top-level (e.g. query/url).
         if any(k in ops_or_plan for k in ("query", "url")):
             return dict(ops_or_plan)
-        return {"ops": [ops_or_plan]}
-    raise SkillExecutionError(f"Invalid plan/ops type: {type(ops_or_plan).__name__}")
+        return {"tool_calls": [ops_or_plan]}
+    raise SkillExecutionError(f"Invalid plan/tool_calls type: {type(ops_or_plan).__name__}")
 
 
 def _try_get_logger():

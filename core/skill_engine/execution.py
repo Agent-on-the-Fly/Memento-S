@@ -34,7 +34,7 @@ def run_one_skill(user_text: str, skill_name: str) -> str:
 def run_one_skill_loop(user_text: str, skill_name: str, max_rounds: int = 50) -> str:
     """
     Run one skill with multi-round planning until completion or *max_rounds*.
-    Skills execute via the SKILL.md bridge path (``ops``/``final``) only.
+    Skills execute via the SKILL.md bridge path (``tool_calls``/``final``) only.
     """
     skill_md = openskills_read(skill_name)
     log_event(
@@ -72,9 +72,11 @@ def run_one_skill_loop(user_text: str, skill_name: str, max_rounds: int = 50) ->
                 log_event("run_one_skill_loop_end", skill_name=skill_name, round=round_no, result=result, mode="final")
                 return result
 
-        # ---- execute ops via the bridge executor ----
+        # ---- execute tool calls via the bridge executor ----
+        tool_calls = plan.get("tool_calls") if isinstance(plan, dict) else None
         ops = plan.get("ops") if isinstance(plan, dict) else None
-        if isinstance(ops, list) and ops:
+        has_calls = (isinstance(tool_calls, list) and bool(tool_calls)) or (isinstance(ops, list) and bool(ops))
+        if has_calls:
             try:
                 result_str = execute_skill_plan(skill_name, plan).strip()
             except (KeyError, TypeError, ValueError, AttributeError) as e:
@@ -88,7 +90,7 @@ def run_one_skill_loop(user_text: str, skill_name: str, max_rounds: int = 50) ->
                     plan_preview=plan_preview,
                 )
                 feedback = (
-                    f"ERROR executing ops: {error_msg}\n\nYour plan was:\n{plan_preview}\n\n"
+                    f"ERROR executing tool_calls: {error_msg}\n\nYour plan was:\n{plan_preview}\n\n"
                     "Please fix the plan structure and try again."
                 )
                 messages.append({"role": "user", "content": feedback})
@@ -107,7 +109,7 @@ def run_one_skill_loop(user_text: str, skill_name: str, max_rounds: int = 50) ->
                 messages.append(
                     {
                         "role": "user",
-                        "content": "Previous ops output:\n" + _truncate_middle(result_str[9:], SKILL_LOOP_FEEDBACK_CHARS),
+                        "content": "Previous tool output:\n" + _truncate_middle(result_str[9:], SKILL_LOOP_FEEDBACK_CHARS),
                     }
                 )
                 continue
@@ -115,7 +117,7 @@ def run_one_skill_loop(user_text: str, skill_name: str, max_rounds: int = 50) ->
             # -- auto-continue heuristic --
             if should_auto_continue_skill_result(skill_name, result_str):
                 feedback = (
-                    "Previous ops output appears to be an intermediate step, not final completion. "
+                    "Previous tool output appears to be an intermediate step, not final completion. "
                     "Continue following SKILL.md and execute the next concrete step "
                     "(e.g. download/fetch/unpack/read/summarize), and avoid repeating only existence checks."
                 )
@@ -131,23 +133,29 @@ def run_one_skill_loop(user_text: str, skill_name: str, max_rounds: int = 50) ->
                     {
                         "role": "user",
                         "content": feedback
-                        + "\n\nPrevious ops output:\n"
+                        + "\n\nPrevious tool output:\n"
                         + _truncate_middle(result_str, SKILL_LOOP_FEEDBACK_CHARS),
                     }
                 )
                 continue
 
             # -- done --
-            log_event("run_one_skill_loop_end", skill_name=skill_name, round=round_no, result=result_str, mode="ops_result")
+            log_event(
+                "run_one_skill_loop_end",
+                skill_name=skill_name,
+                round=round_no,
+                result=result_str,
+                mode="tool_calls_result",
+            )
             return result_str
 
-        # ---- no ops and no final – ask the model to try again ----
+        # ---- no tool_calls and no final – ask the model to try again ----
         messages.append(
             {
                 "role": "user",
                 "content": (
-                    "Your previous response had no executable `ops` and no `final` answer. "
-                    'Return either {"final":"..."} or a valid ops array.'
+                    "Your previous response had no executable `tool_calls` and no `final` answer. "
+                    'Return either {"final":"..."} or a valid OpenAI-style `tool_calls` array.'
                 ),
             }
         )
@@ -191,15 +199,17 @@ def run_skill_once_with_plan(
             if isinstance(final, str) and final.strip():
                 return final.strip(), last_plan
 
+        tool_calls = plan.get("tool_calls") if isinstance(plan, dict) else None
         ops = plan.get("ops") if isinstance(plan, dict) else None
-        if isinstance(ops, list) and ops:
+        has_calls = (isinstance(tool_calls, list) and bool(tool_calls)) or (isinstance(ops, list) and bool(ops))
+        if has_calls:
             try:
                 result_str = execute_skill_plan(skill_name, plan).strip()
             except (KeyError, TypeError, ValueError, AttributeError) as e:
                 plan_preview = json.dumps(plan, indent=2, ensure_ascii=False)[:1500]
                 error_msg = f"{type(e).__name__}: {e}"
                 feedback = (
-                    f"ERROR executing ops: {error_msg}\n\nYour plan was:\n{plan_preview}\n\n"
+                    f"ERROR executing tool_calls: {error_msg}\n\nYour plan was:\n{plan_preview}\n\n"
                     "Please fix the plan structure and try again."
                 )
                 messages.append({"role": "user", "content": feedback})
@@ -212,14 +222,14 @@ def run_skill_once_with_plan(
                 messages.append(
                     {
                         "role": "user",
-                        "content": "Previous ops output:\n" + _truncate_middle(out, SKILL_LOOP_FEEDBACK_CHARS),
+                        "content": "Previous tool output:\n" + _truncate_middle(out, SKILL_LOOP_FEEDBACK_CHARS),
                     }
                 )
                 continue
 
             if should_auto_continue_skill_result(skill_name, result_str):
                 feedback = (
-                    "Previous ops output appears to be an intermediate step, not final completion. "
+                    "Previous tool output appears to be an intermediate step, not final completion. "
                     "Continue following SKILL.md and execute the next concrete step "
                     "(e.g. download/fetch/unpack/read/summarize), and avoid repeating only existence checks."
                 )
@@ -228,7 +238,7 @@ def run_skill_once_with_plan(
                     {
                         "role": "user",
                         "content": feedback
-                        + "\n\nPrevious ops output:\n"
+                        + "\n\nPrevious tool output:\n"
                         + _truncate_middle(result_str, SKILL_LOOP_FEEDBACK_CHARS),
                     }
                 )
@@ -240,8 +250,8 @@ def run_skill_once_with_plan(
             {
                 "role": "user",
                 "content": (
-                    "Your previous response had no executable `ops` and no `final` answer. "
-                    'Return either {"final":"..."} or a valid ops array.'
+                    "Your previous response had no executable `tool_calls` and no `final` answer. "
+                    'Return either {"final":"..."} or a valid OpenAI-style `tool_calls` array.'
                 ),
             }
         )
@@ -257,7 +267,7 @@ def run_skill_once_with_plan(
 def should_auto_continue_skill_result(skill_name: str, result_str: str) -> bool:
     """
     Heuristic continuation trigger for non-bridge skills.
-    If a skill only returns intermediate bridge op output, ask it to continue
+    If a skill only returns intermediate bridge tool-call output, ask it to continue
     instead of stopping.
     """
     name = str(skill_name or "").strip()
@@ -274,7 +284,7 @@ def should_auto_continue_skill_result(skill_name: str, result_str: str) -> bool:
     if re.fullmatch(r"\[op#\d+:[^\]]+\]\s*NOT_FOUND", text, re.DOTALL):
         return True
 
-    # Non-bridge skills should keep iterating when they still return bridge op blocks.
+    # Non-bridge skills should keep iterating when they still return bridge tool-call blocks.
     if re.search(r"\[op#\d+:[^\]]+\]", text):
         return True
 

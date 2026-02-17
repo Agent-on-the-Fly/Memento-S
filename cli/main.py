@@ -1153,7 +1153,6 @@ def _execute_turn(
         return value
 
     runner.set_conversation_history(history)
-    allow_create_retry = bool(create_on_miss)
     last_assistant = ""
     try:
         while True:
@@ -1217,7 +1216,7 @@ def _execute_turn(
 
                     if status == "no_match":
                         reason = str(step_info.get("reason") or "").strip()
-                        if allow_create_retry:
+                        if create_on_miss:
                             print("Tool> router: no matching skill, trying skill-creator")
                             t_creator = time.perf_counter()
                             created, created_skill, report = _run_quiet_call(
@@ -1233,7 +1232,6 @@ def _execute_turn(
                                     "[debug][timing] create_on_miss: "
                                     f"{time.perf_counter() - t_creator:.3f}s"
                                 )
-                            allow_create_retry = False
                             if created and isinstance(created_skill, str) and created_skill.strip():
                                 print(f"Tool> router: created skill `{created_skill.strip()}`, retrying request")
                                 try:
@@ -1256,6 +1254,33 @@ def _execute_turn(
 
                     if status == "error":
                         text = str(result or "Skill execution error").strip()
+                        if create_on_miss and text.startswith("Unknown skill:"):
+                            print("Tool> skill unavailable, trying skill-creator")
+                            t_creator = time.perf_counter()
+                            created, created_skill, report = _run_quiet_call(
+                                lambda: create_skill_on_miss(
+                                    user_text,
+                                    router_reason=text,
+                                    available_skill_names=runner.get_skill_names(),
+                                ),
+                                debug=debug,
+                            )
+                            if debug:
+                                print(
+                                    "[debug][timing] create_on_miss(on_error): "
+                                    f"{time.perf_counter() - t_creator:.3f}s"
+                                )
+                            if created and isinstance(created_skill, str) and created_skill.strip():
+                                print(f"Tool> router: created skill `{created_skill.strip()}`, retrying request")
+                                try:
+                                    runner.reload_skills_metadata()
+                                except Exception as exc:
+                                    if debug:
+                                        print(f"[debug] reload_skills_metadata failed: {exc}")
+                                should_retry = True
+                                break
+                            if debug and report:
+                                print(f"[debug] create_on_miss(on_error) skipped/failed: {report}")
                         print(f"Assistant> {text}\n")
                         return _return_with_timing(text)
 

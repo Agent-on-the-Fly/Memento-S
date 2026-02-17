@@ -346,14 +346,53 @@ def main() -> None:
                         print(f"[debug] auto-fetched skill: {name!r} ({fetch_msg})")
                     log_event("skill_dynamic_fetch", skill=name, ok=True, detail=fetch_msg, step=1)
                 else:
-                    print(f"Assistant> Unknown skill: {name!r}\n")
-                    log_event(
-                        "assistant_output",
-                        kind="error",
-                        text=f"Unknown skill: {name!r}",
-                        detail=fetch_msg,
-                    )
-                    continue
+                    created = False
+                    created_skill_name: str | None = None
+                    create_report = ""
+                    if CLI_CREATE_ON_MISS:
+                        available_skill_names_list = sorted(
+                            {
+                                str(s.get("name") or "").strip()
+                                for s in skills
+                                if isinstance(s, dict) and str(s.get("name") or "").strip()
+                            }
+                        )
+                        created, created_skill_name, create_report = create_skill_on_miss(
+                            user,
+                            router_reason=str(fetch_msg or "").strip() or None,
+                            available_skill_names=available_skill_names_list,
+                        )
+                        log_event(
+                            "create_on_miss_attempt",
+                            user_text=user,
+                            router_reason=fetch_msg,
+                            created=created,
+                            created_skill=created_skill_name,
+                            report=create_report,
+                            step=1,
+                        )
+                        if created and isinstance(created_skill_name, str) and created_skill_name.strip():
+                            name = created_skill_name.strip()
+                            skills, skills_xml, skill_names = _reload_skills_catalog(skills, skills_xml)
+                            skill_names = set(skill_names)
+                            skill_names.add(name)
+                            if DEBUG:
+                                print(
+                                    f"[debug] create_on_miss created skill={name!r}; "
+                                    "rerouted to next_step (step 1)"
+                                )
+                        elif DEBUG and create_report:
+                            print(f"[debug] create_on_miss skipped/failed at step 1: {create_report}")
+                    if not created:
+                        print(f"Assistant> Unknown skill: {name!r}\n")
+                        log_event(
+                            "assistant_output",
+                            kind="error",
+                            text=f"Unknown skill: {name!r}",
+                            detail=fetch_msg,
+                            create_on_miss_report=create_report,
+                        )
+                        continue
 
             step_user = decision.get("user") or decision.get("user_text") or user
             if DEBUG:
@@ -413,10 +452,61 @@ def main() -> None:
                     log_event("workflow_done", step=step_num, reason=reason)
                     break
                 if next_action == "none":
-                    if DEBUG:
-                        print("[debug] no more steps needed\n")
-                    log_event("workflow_none", step=step_num, reason=next_decision.get("reason"))
-                    break
+                    create_report = ""
+                    if CLI_CREATE_ON_MISS:
+                        available_skill_names_list = sorted(
+                            {
+                                str(s.get("name") or "").strip()
+                                for s in skills
+                                if isinstance(s, dict) and str(s.get("name") or "").strip()
+                            }
+                        )
+                        created, created_skill_name, create_report = create_skill_on_miss(
+                            user,
+                            router_reason=str(next_decision.get("reason") or "").strip() or None,
+                            available_skill_names=available_skill_names_list,
+                        )
+                        log_event(
+                            "create_on_miss_attempt",
+                            user_text=user,
+                            router_reason=next_decision.get("reason"),
+                            created=created,
+                            created_skill=created_skill_name,
+                            report=create_report,
+                            step=step_num,
+                        )
+                        if created and isinstance(created_skill_name, str) and created_skill_name.strip():
+                            created_skill = created_skill_name.strip()
+                            skills, skills_xml, skill_names = _reload_skills_catalog(skills, skills_xml)
+                            skill_names = set(skill_names)
+                            skill_names.add(created_skill)
+                            next_decision = {
+                                "action": "next_step",
+                                "name": created_skill,
+                                "user": user,
+                                "reason": "create_on_miss",
+                            }
+                            next_action = "next_step"
+                            if DEBUG:
+                                print(
+                                    f"[debug] create_on_miss created skill={created_skill!r}; "
+                                    f"rerouted to next_step (step {step_num})"
+                                )
+                        elif DEBUG and create_report:
+                            print(
+                                f"[debug] create_on_miss skipped/failed at step {step_num}: "
+                                f"{create_report}"
+                            )
+                    if next_action == "none":
+                        if DEBUG:
+                            print("[debug] no more steps needed\n")
+                        log_event(
+                            "workflow_none",
+                            step=step_num,
+                            reason=next_decision.get("reason"),
+                            create_on_miss_report=create_report,
+                        )
+                        break
                 if next_action != "next_step":
                     log_event(
                         "workflow_unknown_action",
@@ -446,15 +536,57 @@ def main() -> None:
                             step=step_num,
                         )
                     else:
-                        print(f"Assistant> Unknown skill: {next_name!r}\n")
-                        log_event(
-                            "assistant_output",
-                            kind="error",
-                            text=f"Unknown skill: {next_name!r}",
-                            detail=fetch_msg,
-                            step=step_num,
-                        )
-                        break
+                        created = False
+                        created_skill_name: str | None = None
+                        create_report = ""
+                        if CLI_CREATE_ON_MISS:
+                            available_skill_names_list = sorted(
+                                {
+                                    str(s.get("name") or "").strip()
+                                    for s in skills
+                                    if isinstance(s, dict) and str(s.get("name") or "").strip()
+                                }
+                            )
+                            created, created_skill_name, create_report = create_skill_on_miss(
+                                user,
+                                router_reason=str(fetch_msg or "").strip() or None,
+                                available_skill_names=available_skill_names_list,
+                            )
+                            log_event(
+                                "create_on_miss_attempt",
+                                user_text=user,
+                                router_reason=fetch_msg,
+                                created=created,
+                                created_skill=created_skill_name,
+                                report=create_report,
+                                step=step_num,
+                            )
+                            if created and isinstance(created_skill_name, str) and created_skill_name.strip():
+                                next_name = created_skill_name.strip()
+                                skills, skills_xml, skill_names = _reload_skills_catalog(skills, skills_xml)
+                                skill_names = set(skill_names)
+                                skill_names.add(next_name)
+                                if DEBUG:
+                                    print(
+                                        f"[debug] create_on_miss created skill={next_name!r}; "
+                                        f"rerouted to next_step (step {step_num})"
+                                    )
+                            elif DEBUG and create_report:
+                                print(
+                                    f"[debug] create_on_miss skipped/failed at step {step_num}: "
+                                    f"{create_report}"
+                                )
+                        if not created:
+                            print(f"Assistant> Unknown skill: {next_name!r}\n")
+                            log_event(
+                                "assistant_output",
+                                kind="error",
+                                text=f"Unknown skill: {next_name!r}",
+                                detail=fetch_msg,
+                                step=step_num,
+                                create_on_miss_report=create_report,
+                            )
+                            break
 
                 next_user = next_decision.get("user") or next_decision.get("user_text") or user
                 next_user_str = next_user if isinstance(next_user, str) else user
