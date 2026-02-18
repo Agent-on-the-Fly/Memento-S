@@ -4,26 +4,175 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
+from typing import Any
 
 from core.config import BUILTIN_BRIDGE_SKILLS, SKILL_LOOP_FEEDBACK_CHARS
-from core.utils.logging_utils import log_event
-from core.utils.path_utils import _truncate, _truncate_middle
+from core.skill_engine.common import extract_final_text, has_executable_calls
 from core.skill_engine.planning import ask_for_plan
 from core.skill_engine.skill_executor import execute_skill_plan
 from core.skill_engine.skill_resolver import openskills_read
+from core.utils.logging_utils import log_event
+from core.utils.path_utils import _truncate, _truncate_middle
+
+_PLAN_RETRY_HINT = (
+    "Your previous response had no executable `tool_calls` and no `final` answer. "
+    'Return either {"final":"..."} or a valid OpenAI-style `tool_calls` array.'
+)
+_AUTO_CONTINUE_FEEDBACK = (
+    "Previous tool output appears to be an intermediate step, not final completion. "
+    "Continue following SKILL.md and execute the next concrete step "
+    "(e.g. download/fetch/unpack/read/summarize), and avoid repeating only existence checks."
+)
+
+
+@dataclass(frozen=True)
+class _LoopOptions:
+    """Configuration for the shared multi-round execution loop."""
+
+    max_rounds: int
+    include_max_rounds_value: bool
+    emit_logs: bool
+
+
+@dataclass(frozen=True)
+class _LoopResult:
+    """Final loop result with optional plan snapshot."""
+
+    output: str
+    last_plan: dict[str, Any]
+
+
+def _initial_messages(user_text: str, skill_md: str) -> list[dict[str, str]]:
+    return [
+        {"role": "user", "content": f"# Loaded SKILL.md\n\n{skill_md}"},
+        {"role": "user", "content": user_text},
+    ]
+
+
+
+def _append_execution_error_feedback(messages: list[dict[str, str]], plan: Any, error_msg: str) -> None:
+    plan_preview = json.dumps(plan, indent=2, ensure_ascii=False)[:1500]
+    feedback = (
+        f"ERROR executing tool_calls: {error_msg}\n\nYour plan was:\n{plan_preview}\n\n"
+        "Please fix the plan structure and try again."
+    )
+    messages.append({"role": "user", "content": feedback})
+
+
+def _append_previous_output_feedback(messages: list[dict[str, str]], output: str, *, prefix: str = "") -> None:
+    messages.append(
+        {
+            "role": "user",
+            "content": prefix + "Previous tool output:\n" + _truncate_middle(output, SKILL_LOOP_FEEDBACK_CHARS),
+        }
+    )
+
+
+def _run_skill_loop(
+    user_text: str,
+    skill_name: str,
+    *,
+    skill_md: str,
+    options: _LoopOptions,
+) -> _LoopResult:
+    messages = _initial_messages(user_text, skill_md)
+    last_plan: dict[str, Any] = {}
+    last_outputs: list[str] = []
+
+    for round_no in range(1, options.max_rounds + 1):
+        if options.emit_logs:
+            log_event("run_one_skill_loop_round_start", skill_name=skill_name, round=round_no)
+
+        plan = ask_for_plan(user_text, skill_md, skill_name, messages=messages)
+        last_plan = plan if isinstance(plan, dict) else {}
+
+        if options.emit_logs:
+            log_event("run_one_skill_loop_round_plan", skill_name=skill_name, round=round_no, plan=plan)
+
+        final_text = extract_final_text(plan)
+        if final_text is not None:
+            if options.emit_logs:
+                mode = "handled" if isinstance(plan, dict) and plan.get("_handled") else "final"
+                log_event("run_one_skill_loop_end", skill_name=skill_name, round=round_no, result=final_text, mode=mode)
+            return _LoopResult(output=final_text, last_plan=last_plan)
+
+        if has_executable_calls(plan):
+            try:
+                result_str = execute_skill_plan(skill_name, plan if isinstance(plan, dict) else {}).strip()
+            except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                error_msg = f"{type(exc).__name__}: {exc}"
+                if options.emit_logs:
+                    plan_preview = json.dumps(plan, indent=2, ensure_ascii=False)[:1500]
+                    log_event(
+                        "run_one_skill_loop_exec_error",
+                        skill_name=skill_name,
+                        round=round_no,
+                        error=error_msg,
+                        plan_preview=plan_preview,
+                    )
+                _append_execution_error_feedback(messages, plan, error_msg)
+                last_outputs.append(error_msg)
+                continue
+
+            if result_str.startswith("CONTINUE:"):
+                out = result_str[9:].strip()
+                if options.emit_logs:
+                    log_event("run_one_skill_loop_continue", skill_name=skill_name, round=round_no, output=result_str)
+                last_outputs.append(out)
+                _append_previous_output_feedback(messages, out)
+                continue
+
+            if should_auto_continue_skill_result(skill_name, result_str):
+                if options.emit_logs:
+                    log_event(
+                        "run_one_skill_loop_auto_continue",
+                        skill_name=skill_name,
+                        round=round_no,
+                        output=result_str,
+                        feedback=_AUTO_CONTINUE_FEEDBACK,
+                    )
+                last_outputs.append(result_str)
+                _append_previous_output_feedback(messages, result_str, prefix=_AUTO_CONTINUE_FEEDBACK + "\n\n")
+                continue
+
+            if options.emit_logs:
+                log_event(
+                    "run_one_skill_loop_end",
+                    skill_name=skill_name,
+                    round=round_no,
+                    result=result_str,
+                    mode="tool_calls_result",
+                )
+            return _LoopResult(output=result_str, last_plan=last_plan)
+
+        messages.append({"role": "user", "content": _PLAN_RETRY_HINT})
+
+    hint = "\n".join(_truncate(x) for x in last_outputs[:8])
+    if options.include_max_rounds_value:
+        output = f"ERR: exceeded max_rounds={options.max_rounds}\n\nLast outputs:\n{hint}".strip()
+    else:
+        output = f"ERR: exceeded max_rounds\n\nLast outputs:\n{hint}".strip()
+
+    if options.emit_logs:
+        log_event(
+            "run_one_skill_loop_end",
+            skill_name=skill_name,
+            round=options.max_rounds,
+            result=output,
+            mode="max_rounds",
+        )
+    return _LoopResult(output=output, last_plan=last_plan)
+
 
 def run_one_skill(user_text: str, skill_name: str) -> str:
     """Single-shot skill execution (no multi-round loop)."""
     skill_md = openskills_read(skill_name)
     plan = ask_for_plan(user_text, skill_md, skill_name)
-    if isinstance(plan, dict) and plan.get("_handled"):
-        return str(plan.get("result", "")).strip()
 
-    final = plan.get("final") if isinstance(plan, dict) else None
-    if not isinstance(final, str) or not final.strip():
-        final = plan.get("result") if isinstance(plan, dict) else None
-    if isinstance(final, str) and final.strip():
-        return final.strip()
+    final_text = extract_final_text(plan)
+    if final_text is not None:
+        return final_text
 
     try:
         return execute_skill_plan(skill_name, plan if isinstance(plan, dict) else {})
@@ -43,128 +192,8 @@ def run_one_skill_loop(user_text: str, skill_name: str, max_rounds: int = 50) ->
         user_text=user_text,
         max_rounds=max_rounds,
     )
-
-    # Keep a running history so the model can see prior outputs.
-    messages: list[dict] = [
-        {"role": "user", "content": f"# Loaded SKILL.md\n\n{skill_md}"},
-        {"role": "user", "content": user_text},
-    ]
-
-    last_outputs: list[str] = []
-    for round_no in range(1, max_rounds + 1):
-        log_event("run_one_skill_loop_round_start", skill_name=skill_name, round=round_no)
-        plan = ask_for_plan(user_text, skill_md, skill_name, messages=messages)
-        log_event("run_one_skill_loop_round_plan", skill_name=skill_name, round=round_no, plan=plan)
-
-        # ---- handled (rejected / error) ----
-        if isinstance(plan, dict) and plan.get("_handled"):
-            result = str(plan.get("result", "")).strip()
-            log_event("run_one_skill_loop_end", skill_name=skill_name, round=round_no, result=result, mode="handled")
-            return result
-
-        # ---- final answer ----
-        if isinstance(plan, dict):
-            final = plan.get("final")
-            if not isinstance(final, str) or not final.strip():
-                final = plan.get("result")
-            if isinstance(final, str) and final.strip():
-                result = final.strip()
-                log_event("run_one_skill_loop_end", skill_name=skill_name, round=round_no, result=result, mode="final")
-                return result
-
-        # ---- execute tool calls via the bridge executor ----
-        tool_calls = plan.get("tool_calls") if isinstance(plan, dict) else None
-        ops = plan.get("ops") if isinstance(plan, dict) else None
-        has_calls = (isinstance(tool_calls, list) and bool(tool_calls)) or (isinstance(ops, list) and bool(ops))
-        if has_calls:
-            try:
-                result_str = execute_skill_plan(skill_name, plan).strip()
-            except (KeyError, TypeError, ValueError, AttributeError) as e:
-                plan_preview = json.dumps(plan, indent=2, ensure_ascii=False)[:1500]
-                error_msg = f"{type(e).__name__}: {e}"
-                log_event(
-                    "run_one_skill_loop_exec_error",
-                    skill_name=skill_name,
-                    round=round_no,
-                    error=error_msg,
-                    plan_preview=plan_preview,
-                )
-                feedback = (
-                    f"ERROR executing tool_calls: {error_msg}\n\nYour plan was:\n{plan_preview}\n\n"
-                    "Please fix the plan structure and try again."
-                )
-                messages.append({"role": "user", "content": feedback})
-                last_outputs.append(error_msg)
-                continue
-
-            # -- CONTINUE: protocol --
-            if result_str.startswith("CONTINUE:"):
-                log_event(
-                    "run_one_skill_loop_continue",
-                    skill_name=skill_name,
-                    round=round_no,
-                    output=result_str,
-                )
-                last_outputs.append(result_str[9:].strip())
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": "Previous tool output:\n" + _truncate_middle(result_str[9:], SKILL_LOOP_FEEDBACK_CHARS),
-                    }
-                )
-                continue
-
-            # -- auto-continue heuristic --
-            if should_auto_continue_skill_result(skill_name, result_str):
-                feedback = (
-                    "Previous tool output appears to be an intermediate step, not final completion. "
-                    "Continue following SKILL.md and execute the next concrete step "
-                    "(e.g. download/fetch/unpack/read/summarize), and avoid repeating only existence checks."
-                )
-                log_event(
-                    "run_one_skill_loop_auto_continue",
-                    skill_name=skill_name,
-                    round=round_no,
-                    output=result_str,
-                    feedback=feedback,
-                )
-                last_outputs.append(result_str)
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": feedback
-                        + "\n\nPrevious tool output:\n"
-                        + _truncate_middle(result_str, SKILL_LOOP_FEEDBACK_CHARS),
-                    }
-                )
-                continue
-
-            # -- done --
-            log_event(
-                "run_one_skill_loop_end",
-                skill_name=skill_name,
-                round=round_no,
-                result=result_str,
-                mode="tool_calls_result",
-            )
-            return result_str
-
-        # ---- no tool_calls and no final – ask the model to try again ----
-        messages.append(
-            {
-                "role": "user",
-                "content": (
-                    "Your previous response had no executable `tool_calls` and no `final` answer. "
-                    'Return either {"final":"..."} or a valid OpenAI-style `tool_calls` array.'
-                ),
-            }
-        )
-        continue
-
-    hint = "\n".join(_truncate(x) for x in last_outputs[:8])
-    result = f"ERR: exceeded max_rounds={max_rounds}\n\nLast outputs:\n{hint}".strip()
-    log_event("run_one_skill_loop_end", skill_name=skill_name, round=max_rounds, result=result, mode="max_rounds")
-    return result
+    options = _LoopOptions(max_rounds=max_rounds, include_max_rounds_value=True, emit_logs=True)
+    return _run_skill_loop(user_text, skill_name, skill_md=skill_md, options=options).output
 
 
 def run_skill_once_with_plan(
@@ -178,86 +207,9 @@ def run_skill_once_with_plan(
     Mirrors TUI workflow behaviour.
     """
     skill_md = openskills_read(skill_name)
-    messages: list[dict] = [
-        {"role": "user", "content": f"# Loaded SKILL.md\n\n{skill_md}"},
-        {"role": "user", "content": user_text},
-    ]
-
-    last_plan: dict = {}
-    last_outputs: list[str] = []
-    for _round in range(1, max_rounds + 1):
-        plan = ask_for_plan(user_text, skill_md, skill_name, messages=messages)
-        last_plan = plan if isinstance(plan, dict) else {}
-
-        if isinstance(plan, dict) and plan.get("_handled"):
-            return str(plan.get("result", "")).strip(), last_plan
-
-        if isinstance(plan, dict):
-            final = plan.get("final")
-            if not isinstance(final, str) or not final.strip():
-                final = plan.get("result")
-            if isinstance(final, str) and final.strip():
-                return final.strip(), last_plan
-
-        tool_calls = plan.get("tool_calls") if isinstance(plan, dict) else None
-        ops = plan.get("ops") if isinstance(plan, dict) else None
-        has_calls = (isinstance(tool_calls, list) and bool(tool_calls)) or (isinstance(ops, list) and bool(ops))
-        if has_calls:
-            try:
-                result_str = execute_skill_plan(skill_name, plan).strip()
-            except (KeyError, TypeError, ValueError, AttributeError) as e:
-                plan_preview = json.dumps(plan, indent=2, ensure_ascii=False)[:1500]
-                error_msg = f"{type(e).__name__}: {e}"
-                feedback = (
-                    f"ERROR executing tool_calls: {error_msg}\n\nYour plan was:\n{plan_preview}\n\n"
-                    "Please fix the plan structure and try again."
-                )
-                messages.append({"role": "user", "content": feedback})
-                last_outputs.append(error_msg)
-                continue
-
-            if result_str.startswith("CONTINUE:"):
-                out = result_str[9:].strip()
-                last_outputs.append(out)
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": "Previous tool output:\n" + _truncate_middle(out, SKILL_LOOP_FEEDBACK_CHARS),
-                    }
-                )
-                continue
-
-            if should_auto_continue_skill_result(skill_name, result_str):
-                feedback = (
-                    "Previous tool output appears to be an intermediate step, not final completion. "
-                    "Continue following SKILL.md and execute the next concrete step "
-                    "(e.g. download/fetch/unpack/read/summarize), and avoid repeating only existence checks."
-                )
-                last_outputs.append(result_str)
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": feedback
-                        + "\n\nPrevious tool output:\n"
-                        + _truncate_middle(result_str, SKILL_LOOP_FEEDBACK_CHARS),
-                    }
-                )
-                continue
-
-            return result_str, last_plan
-
-        messages.append(
-            {
-                "role": "user",
-                "content": (
-                    "Your previous response had no executable `tool_calls` and no `final` answer. "
-                    'Return either {"final":"..."} or a valid OpenAI-style `tool_calls` array.'
-                ),
-            }
-        )
-
-    hint = "\n".join(_truncate(x) for x in last_outputs[:8])
-    return f"ERR: exceeded max_rounds\n\nLast outputs:\n{hint}".strip(), last_plan
+    options = _LoopOptions(max_rounds=max_rounds, include_max_rounds_value=False, emit_logs=False)
+    loop_result = _run_skill_loop(user_text, skill_name, skill_md=skill_md, options=options)
+    return loop_result.output, loop_result.last_plan
 
 
 # ---------------------------------------------------------------------------

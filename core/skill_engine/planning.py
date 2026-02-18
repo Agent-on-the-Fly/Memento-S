@@ -10,6 +10,7 @@ from core.config import DEBUG
 from core.llm import openrouter_messages
 from core.utils.json_utils import parse_json_output
 from core.utils.logging_utils import log_event
+from core.skill_engine.common import extract_final_text, has_executable_calls
 from core.skill_engine.skill_executor import normalize_plan_shape
 
 def ask_for_plan(
@@ -145,22 +146,14 @@ def validate_plan_for_skill(plan: dict, skill_name: str) -> bool:
         return False
 
     # Allow a final answer as escape hatch
-    final = plan.get("final")
-    if not isinstance(final, str) or not final.strip():
-        final = plan.get("result")
-    if isinstance(final, str) and final.strip():
+    if extract_final_text(plan) is not None:
         return True
 
-    # All skills should use tool_calls (ops is accepted for back-compat).
-    tool_calls = plan.get("tool_calls")
-    has_tool_calls = isinstance(tool_calls, list) and len(tool_calls) > 0
-    ops = plan.get("ops")
-    has_ops = isinstance(ops, list) and len(ops) > 0
-
+    has_calls = has_executable_calls(plan)
     if skill_name == "skill-creator":
-        return bool(plan.get("action") and plan.get("skill_name") and (has_tool_calls or has_ops))
+        return bool(plan.get("action") and plan.get("skill_name") and has_calls)
 
-    return has_tool_calls or has_ops
+    return has_calls
 
 
 def build_strict_schema_prompt(skill_name: str) -> str:

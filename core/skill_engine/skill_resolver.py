@@ -4,14 +4,12 @@ Extracted from agent.py to support modular architecture.
 """
 
 import os
-import re
 import shutil
 import subprocess
 import tempfile
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any
 
 from core.config import (
     PROJECT_ROOT,
@@ -21,7 +19,6 @@ from core.config import (
     SKILL_DYNAMIC_FETCH_CATALOG_JSONL,
     SKILL_DYNAMIC_FETCH_ROOT,
     SKILL_DYNAMIC_FETCH_TIMEOUT_SEC,
-    SEMANTIC_ROUTER_DEBUG,
 )
 from core.utils.logging_utils import log_event
 from core.utils.path_utils import _run_command_capture, _NO_GIT_PROMPT_ENV

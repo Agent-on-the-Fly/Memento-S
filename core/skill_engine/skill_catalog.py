@@ -23,8 +23,6 @@ from core.config import (
     ROUTER_DYNAMIC_GAP_MAX_CHARS,
     SEMANTIC_ROUTER_METHOD,
     SEMANTIC_ROUTER_BASE_SKILLS,
-    SEMANTIC_ROUTER_CATALOG_JSONL,
-    SEMANTIC_ROUTER_CATALOG_MD,
     SEMANTIC_ROUTER_DEBUG,
     SEMANTIC_ROUTER_EMBED_BATCH_SIZE,
     SEMANTIC_ROUTER_EMBED_CACHE_DIR,
@@ -35,13 +33,10 @@ from core.config import (
     SEMANTIC_ROUTER_MEMENTO_QWEN_TOKENIZER_PATH,
     SEMANTIC_ROUTER_QWEN_MODEL_PATH,
     SEMANTIC_ROUTER_QWEN_TOKENIZER_PATH,
-    SEMANTIC_ROUTER_ENABLED,
     SEMANTIC_ROUTER_TOP_K,
-    SEMANTIC_ROUTER_WRITE_VISIBLE_AGENTS,
 )
 from core.utils.json_utils import parse_json_output
 from core.llm import openrouter_messages
-from core.utils.logging_utils import log_event
 from core.utils.path_utils import _truncate_middle, _xml_escape
 
 # ---------------------------------------------------------------------------
@@ -339,7 +334,6 @@ def select_semantic_top_skills(
     q_tokens = _tokenize_for_semantic(goal_text)
     q_tf: Counter = Counter(q_tokens)
 
-    base_names = {name for name in SEMANTIC_ROUTER_BASE_SKILLS if name}
     name_to_skill = {str(s.get("name") or "").strip(): s for s in skills}
     forced = [name_to_skill[n] for n in SEMANTIC_ROUTER_BASE_SKILLS if n in name_to_skill]
 

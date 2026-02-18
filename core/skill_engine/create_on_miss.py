@@ -19,6 +19,19 @@ def _should_create_skill_on_miss_fallback(user_text: str) -> tuple[bool, str]:
     return False, "fallback_default"
 
 
+def _normalize_skill_names(available_skill_names: list[str] | None) -> list[str]:
+    """Normalize skill names by stripping, filtering empties, and de-duplicating."""
+    names: list[str] = []
+    for raw_name in available_skill_names or []:
+        if not isinstance(raw_name, str):
+            continue
+        name = raw_name.strip()
+        if not name or name in names:
+            continue
+        names.append(name)
+    return names
+
+
 def should_create_skill_on_miss(
     user_text: str,
     *,
@@ -32,7 +45,7 @@ def should_create_skill_on_miss(
     if not text:
         return False, "empty_input"
 
-    skill_names = [s for s in (available_skill_names or []) if isinstance(s, str) and s.strip()]
+    skill_names = _normalize_skill_names(available_skill_names)
     system_prompt = """You are a skill routing assistant. Decide if a user request should trigger creating a NEW reusable skill.
 
 Answer with a JSON object: {"create": true/false, "reason": "brief explanation"}
@@ -83,8 +96,8 @@ def create_skill_on_miss(
     Try to create a skill via skill-creator for a routing miss.
     Returns ``(created, skill_name, report)``.
     """
-    names = [s for s in (available_skill_names or []) if isinstance(s, str) and s.strip()]
-    if "skill-creator" not in set(names) and not has_local_skill_dir("skill-creator"):
+    names = _normalize_skill_names(available_skill_names)
+    if "skill-creator" not in names and not has_local_skill_dir("skill-creator"):
         return False, None, "skill-creator unavailable"
 
     should_create, why = should_create_skill_on_miss(
