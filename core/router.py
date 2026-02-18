@@ -1,6 +1,7 @@
 """Skill routing logic: explicit matching, semantic selection, LLM-based routing."""
 
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -27,12 +28,30 @@ from core.skill_engine.skill_catalog import (
     build_available_skills_xml,
     write_visible_skills_block,
     ensure_router_embedding_prewarm,
+    select_bm25_top_skills,
     select_router_top_skills,
     _load_router_catalog_from_jsonl,
     _merge_skill_catalog,
     build_router_step_note,
     derive_semantic_goal,
 )
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return int(default)
+    try:
+        return int(str(raw).strip())
+    except Exception:
+        return int(default)
 
 
 def _normalize_router_decision(obj: Any) -> dict:
@@ -136,6 +155,12 @@ def route_skill(
     """
     goal_text = str(routing_goal or user_text or "").strip() or user_text
     debug_enabled = bool(debug) or DEBUG
+    semantic_router_enabled = _env_flag("SEMANTIC_ROUTER_ENABLED", SEMANTIC_ROUTER_ENABLED)
+    semantic_router_top_k = max(1, _env_int("SEMANTIC_ROUTER_TOP_K", SEMANTIC_ROUTER_TOP_K))
+    write_visible_agents = _env_flag(
+        "SEMANTIC_ROUTER_WRITE_VISIBLE_AGENTS",
+        SEMANTIC_ROUTER_WRITE_VISIBLE_AGENTS,
+    )
     t_route = time.perf_counter()
 
     def _debug_timing(label: str, started_at: float) -> None:
@@ -157,6 +182,12 @@ def route_skill(
     visible_skills = skills
     visible_skills_xml = skills_xml
     semantic_catalog_skills = skills
+    skill_extra_catalog = [
+        s
+        for s in skills
+        if isinstance(s, dict) and str(s.get("_source") or "").strip().lower() == "skill_extra"
+    ]
+    skill_extra_topk: list[dict[str, Any]] = []
     catalog_loaded_ok = False
     catalog_source = "runtime"
     t_catalog = time.perf_counter()
@@ -196,24 +227,48 @@ def route_skill(
     _debug_timing("route.catalog_load", t_catalog)
 
     # ------------------------------------------------------------------
+    # 1.5. Always pick top-K from skill_extra via BM25
+    # ------------------------------------------------------------------
+    if skill_extra_catalog:
+        t_extra = time.perf_counter()
+        try:
+            skill_extra_topk = select_bm25_top_skills(
+                goal_text,
+                skill_extra_catalog,
+                top_k=max(1, min(semantic_router_top_k, len(skill_extra_catalog))),
+            )
+            if skill_extra_topk:
+                visible_skills = _merge_skill_catalog(skill_extra_topk, visible_skills)
+                visible_skills_xml = build_available_skills_xml(visible_skills)
+            if SEMANTIC_ROUTER_DEBUG:
+                names = ", ".join(str(s.get("name") or "").strip() for s in skill_extra_topk)
+                print(f"[semantic-router] skill_extra bm25 topk={len(skill_extra_topk)}: {names}")
+        except Exception as exc:
+            if SEMANTIC_ROUTER_DEBUG:
+                print(f"[semantic-router] skill_extra bm25 failed: {exc}")
+        _debug_timing("route.skill_extra_bm25", t_extra)
+
+    # ------------------------------------------------------------------
     # 2. Semantic top-K selection
     # ------------------------------------------------------------------
-    if SEMANTIC_ROUTER_ENABLED and semantic_catalog_skills:
+    if semantic_router_enabled and semantic_catalog_skills:
         t_semantic = time.perf_counter()
         ensure_router_embedding_prewarm(semantic_catalog_skills)
         _debug_timing("route.embedding_prewarm_trigger", t_semantic)
 
-    if SEMANTIC_ROUTER_ENABLED and semantic_catalog_skills:
+    if semantic_router_enabled and semantic_catalog_skills:
         t_semantic = time.perf_counter()
         selected = select_router_top_skills(
             goal_text,
             semantic_catalog_skills,
-            top_k=SEMANTIC_ROUTER_TOP_K,
+            top_k=semantic_router_top_k,
         )
         if selected:
             visible_skills = _merge_skill_catalog(selected, skills)
+            if skill_extra_topk:
+                visible_skills = _merge_skill_catalog(skill_extra_topk, visible_skills)
             visible_skills_xml = build_available_skills_xml(visible_skills)
-            if SEMANTIC_ROUTER_WRITE_VISIBLE_AGENTS:
+            if write_visible_agents:
                 if catalog_source == "xml" and SEMANTIC_ROUTER_CATALOG_MD and catalog_loaded_ok:
                     same_file = False
                     try:

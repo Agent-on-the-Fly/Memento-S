@@ -178,6 +178,7 @@ from core.skill_engine.skill_executor import (  # noqa: F401
     _web_fetch,
     _execute_web_ops,
     _dispatch_bridge_op,
+    execute_skill_plan_result,
     execute_skill_plan,
 )
 
@@ -251,6 +252,12 @@ def _reload_skills_catalog(
 
 
 def main() -> None:
+    # Keep backward compatibility for `python agent.py` while using the unified CLI runtime.
+    from cli.main import main as cli_main
+
+    cli_main()
+    return
+
     log_path = get_exec_log_path()
     if log_path and DEBUG:
         print(f"[debug] exec log file: {log_path}")

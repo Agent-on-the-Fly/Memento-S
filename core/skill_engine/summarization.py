@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from core.config import STEP_SUMMARY_MAX_TOKENS, STEP_SUMMARY_THRESHOLD
 from core.config import DEBUG
-from core.llm import openrouter_messages
+from core.llm import get_llm_call_budget, openrouter_messages
+from core.utils.logging_utils import log_event
 from core.utils.path_utils import _truncate_middle
 
 def _count_approx_tokens(text: str) -> int:
@@ -28,7 +29,16 @@ def summarize_step_output(
         return step_output
 
     if DEBUG:
-        print(f"[summarize] Step output has ~{approx_tokens} tokens, summarizing to ~{max_tokens}...")
+        log_event(
+            "summarize_step_output_start",
+            approx_tokens=approx_tokens,
+            target_tokens=max_tokens,
+        )
+
+    remaining_budget = get_llm_call_budget()
+    if isinstance(remaining_budget, int) and remaining_budget <= 1:
+        # Preserve budget for routing/planning when the turn is already near limit.
+        return _truncate_middle(step_output, max_tokens * 4)
 
     prompt = f"""You are summarizing a tool execution output for a multi-step task.
 The summary will be used as context for subsequent steps, so preserve information needed to answer the question.
@@ -60,11 +70,15 @@ Return ONLY the summarized content. No explanation or meta-commentary."""
         if summary:
             summary_tokens = _count_approx_tokens(summary)
             if DEBUG:
-                print(f"[summarize] Reduced from ~{approx_tokens} to ~{summary_tokens} tokens")
+                log_event(
+                    "summarize_step_output_done",
+                    approx_tokens=approx_tokens,
+                    summary_tokens=summary_tokens,
+                )
             return summary
     except Exception as exc:
         if DEBUG:
-            print(f"[summarize] Failed to summarize: {exc}, using truncation fallback")
+            log_event("summarize_step_output_error", error=f"{type(exc).__name__}: {exc}")
 
     # Fallback: simple truncation if summarization fails
     return _truncate_middle(step_output, max_tokens * 4)

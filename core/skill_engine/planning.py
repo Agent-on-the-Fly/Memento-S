@@ -54,7 +54,7 @@ def ask_for_plan(
     output = openrouter_messages(system_prompt, messages)
     log_event("ask_for_plan_raw_output", skill_name=skill_name, output=output)
     if DEBUG:
-        print(f"Assistant(raw)>\n{output}\n")
+        log_event("ask_for_plan_debug_raw", skill_name=skill_name, output=output)
     plan = normalize_plan_shape(parse_json_output(output))
     log_event("ask_for_plan_parsed", skill_name=skill_name, plan=plan)
 
@@ -93,7 +93,12 @@ def ask_for_plan(
         )
         log_event("ask_for_plan_retry_raw_output", skill_name=skill_name, output=retry_output, retry_stage="schema")
         if DEBUG:
-            print(f"Assistant(raw retry)>\n{retry_output}\n")
+            log_event(
+                "ask_for_plan_debug_retry_raw",
+                skill_name=skill_name,
+                output=retry_output,
+                retry_stage="schema",
+            )
         plan = normalize_plan_shape(parse_json_output(retry_output))
         log_event("ask_for_plan_retry_parsed", skill_name=skill_name, plan=plan, retry_stage="schema")
 
@@ -106,7 +111,12 @@ def ask_for_plan(
         )
         log_event("ask_for_plan_retry_raw_output", skill_name=skill_name, output=retry_output, retry_stage="strict")
         if DEBUG:
-            print(f"Assistant(raw retry2)>\n{retry_output}\n")
+            log_event(
+                "ask_for_plan_debug_retry_raw",
+                skill_name=skill_name,
+                output=retry_output,
+                retry_stage="strict",
+            )
         plan = normalize_plan_shape(parse_json_output(retry_output))
         log_event("ask_for_plan_retry_parsed", skill_name=skill_name, plan=plan, retry_stage="strict")
         if not plan and retry_output.strip():

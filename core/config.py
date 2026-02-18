@@ -16,8 +16,22 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
-load_dotenv()
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE = (PROJECT_ROOT / ".env").resolve()
+load_dotenv(dotenv_path=ENV_FILE)
+_CONFIG_VERSION = 0
+
+
+def refresh_runtime_config(*, override: bool = True) -> int:
+    """Reload environment values from .env and bump runtime config version."""
+    global _CONFIG_VERSION
+    load_dotenv(dotenv_path=ENV_FILE, override=override)
+    _CONFIG_VERSION += 1
+    return _CONFIG_VERSION
+
+
+def get_runtime_config_version() -> int:
+    return _CONFIG_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +117,8 @@ OPENROUTER_MAX_TOKENS = _env_int("OPENROUTER_MAX_TOKENS", 100000)
 OPENROUTER_TIMEOUT = _env_int("OPENROUTER_TIMEOUT", 60)
 OPENROUTER_RETRIES = _env_int("OPENROUTER_RETRIES", 3)
 OPENROUTER_RETRY_BACKOFF = _env_float("OPENROUTER_RETRY_BACKOFF", 2.0)
+LLM_MAX_CALLS_PER_TURN = max(1, _env_int("LLM_MAX_CALLS_PER_TURN", 24))
+LLM_ENFORCE_CALL_BUDGET = _env_flag("LLM_ENFORCE_CALL_BUDGET", True)
 
 # ---------------------------------------------------------------------------
 # OpenRouter API
@@ -163,11 +179,16 @@ SKILL_DYNAMIC_FETCH_CATALOG_JSONL = (
     or SEMANTIC_ROUTER_CATALOG_JSONL
     or "router_data/skills_catalog.jsonl"
 ).strip()
-_DEFAULT_DYNAMIC_SKILL_ROOT = str(SKILLS_EXTRA_DIRS[0]) if SKILLS_EXTRA_DIRS else "skills-extra"
+_DEFAULT_DYNAMIC_SKILL_ROOT = str(SKILLS_EXTRA_DIRS[0]) if SKILLS_EXTRA_DIRS else "skill_extra"
 SKILL_DYNAMIC_FETCH_ROOT = Path(
     (os.getenv("SKILL_DYNAMIC_FETCH_ROOT") or _DEFAULT_DYNAMIC_SKILL_ROOT).strip()
 ).expanduser()
 SKILL_DYNAMIC_FETCH_TIMEOUT_SEC = max(30, _env_int("SKILL_DYNAMIC_FETCH_TIMEOUT_SEC", 180))
+SKILL_DYNAMIC_FETCH_ALLOWED_REPOS = tuple(
+    s.strip()
+    for s in (os.getenv("SKILL_DYNAMIC_FETCH_ALLOWED_REPOS") or "").replace(";", ",").split(",")
+    if s.strip()
+)
 
 # ---------------------------------------------------------------------------
 # CLI behaviour

@@ -11,9 +11,29 @@ from pathlib import Path
 from typing import Any
 
 from core.config import PROJECT_ROOT, SKILL_DYNAMIC_FETCH_CATALOG_JSONL
+from core.skill_engine.catalog_jsonl import parse_catalog_jsonl_text
 
 _DEFAULT_TIMEOUT_SEC = 12
 _DEFAULT_CACHE_TTL_SEC = 600
+
+
+def _build_catalog_meta(
+    *,
+    ok: bool,
+    source: str,
+    error: str,
+    catalog_ref: str,
+    cached: bool = False,
+    stale: bool = False,
+) -> dict[str, Any]:
+    return {
+        "ok": bool(ok),
+        "source": str(source or "").strip() or "unknown",
+        "error": str(error or "").strip(),
+        "catalog_ref": str(catalog_ref or "").strip(),
+        "cached": bool(cached),
+        "stale": bool(stale),
+    }
 
 
 def _parse_int_or_zero(value: Any) -> int:
@@ -57,22 +77,9 @@ def _choose_entry(entries: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _parse_jsonl_text(text: str) -> list[dict[str, Any]]:
-    by_name: dict[str, list[dict[str, Any]]] = {}
-    for line_no, raw_line in enumerate(str(text or "").splitlines(), 1):
-        line = raw_line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except Exception:
-            continue
-        entry = _normalize_entry(obj, line_no=line_no)
-        if entry is None:
-            continue
-        by_name.setdefault(entry["name"], []).append(entry)
-
+    _skills, by_name = parse_catalog_jsonl_text(text)
     out: list[dict[str, Any]] = []
-    for name in sorted(by_name.keys()):
+    for name in sorted(str(k) for k in by_name.keys()):
         preferred = _choose_entry(by_name.get(name) or [])
         if preferred is not None:
             out.append(preferred)
@@ -127,37 +134,31 @@ def load_cloud_skill_catalog(
     """Load skill catalog from URL or local JSONL file with cache fallback."""
     ref = str(catalog_ref or SKILL_DYNAMIC_FETCH_CATALOG_JSONL or "").strip()
     if not ref:
-        return [], {
-            "ok": False,
-            "source": "none",
-            "error": "empty catalog reference",
-            "catalog_ref": ref,
-            "cached": False,
-            "stale": False,
-        }
+        return [], _build_catalog_meta(
+            ok=False,
+            source="none",
+            error="empty catalog reference",
+            catalog_ref=ref,
+        )
 
     if not _is_url(ref):
         path = _resolve_local_path(ref)
         try:
             text = path.read_text(encoding="utf-8")
         except Exception as exc:
-            return [], {
-                "ok": False,
-                "source": "local",
-                "error": f"failed to read catalog: {exc}",
-                "catalog_ref": str(path),
-                "cached": False,
-                "stale": False,
-            }
+            return [], _build_catalog_meta(
+                ok=False,
+                source="local",
+                error=f"failed to read catalog: {exc}",
+                catalog_ref=str(path),
+            )
         entries = _parse_jsonl_text(text)
-        return entries, {
-            "ok": bool(entries),
-            "source": "local",
-            "error": "" if entries else "catalog has no valid entries",
-            "catalog_ref": str(path),
-            "cached": False,
-            "stale": False,
-        }
+        return entries, _build_catalog_meta(
+            ok=bool(entries),
+            source="local",
+            error="" if entries else "catalog has no valid entries",
+            catalog_ref=str(path),
+        )
 
     cache_path = _cache_path_for_ref(ref)
     cached_payload = _load_cache(cache_path)
@@ -177,14 +178,12 @@ def load_cloud_skill_catalog(
                 "entries": entries,
             },
         )
-        return entries, {
-            "ok": bool(entries),
-            "source": "remote",
-            "error": "" if entries else "catalog has no valid entries",
-            "catalog_ref": ref,
-            "cached": False,
-            "stale": False,
-        }
+        return entries, _build_catalog_meta(
+            ok=bool(entries),
+            source="remote",
+            error="" if entries else "catalog has no valid entries",
+            catalog_ref=ref,
+        )
     except Exception as exc:
         if isinstance(cached_payload, dict):
             entries = cached_payload.get("entries")
@@ -192,22 +191,57 @@ def load_cloud_skill_catalog(
             age_sec = max(0, int(time.time()) - fetched_at) if fetched_at else 10**9
             stale = age_sec > max(1, int(cache_ttl_sec))
             if isinstance(entries, list) and entries:
-                return entries, {
-                    "ok": True,
-                    "source": "cache",
-                    "error": f"remote fetch failed: {exc}",
-                    "catalog_ref": ref,
-                    "cached": True,
-                    "stale": stale,
-                }
-        return [], {
-            "ok": False,
-            "source": "remote",
-            "error": f"remote fetch failed: {exc}",
-            "catalog_ref": ref,
-            "cached": False,
-            "stale": False,
-        }
+                return entries, _build_catalog_meta(
+                    ok=True,
+                    source="cache",
+                    error=f"remote fetch failed: {exc}",
+                    catalog_ref=ref,
+                    cached=True,
+                    stale=stale,
+                )
+        return [], _build_catalog_meta(
+            ok=False,
+            source="remote",
+            error=f"remote fetch failed: {exc}",
+            catalog_ref=ref,
+        )
+
+
+def _score_skill_entry(query: str, tokens: list[str], entry: dict[str, Any]) -> float:
+    name = str(entry.get("name") or "").strip()
+    desc = str(entry.get("description") or "").strip()
+    author = str(entry.get("author") or "").strip()
+    if not name:
+        return 0.0
+
+    name_l = name.lower()
+    desc_l = desc.lower()
+    author_l = author.lower()
+
+    score = 0.0
+    if name_l == query:
+        score += 500
+    if name_l.startswith(query):
+        score += 280
+    if query in name_l:
+        score += 180
+    if query in desc_l:
+        score += 90
+
+    for tok in tokens:
+        if tok in name_l:
+            score += 60
+        if tok in desc_l:
+            score += 20
+        if tok in author_l:
+            score += 10
+
+    stars = _parse_int_or_zero(entry.get("stars"))
+    updated_at = _parse_int_or_zero(entry.get("updatedAt"))
+    score += min(stars, 5000) / 250
+    if updated_at > 0:
+        score += 2
+    return score
 
 
 def search_cloud_skills(
@@ -239,40 +273,7 @@ def search_cloud_skills(
     scored: list[dict[str, Any]] = []
 
     for e in entries:
-        name = str(e.get("name") or "").strip()
-        if not name:
-            continue
-        desc = str(e.get("description") or "").strip()
-        author = str(e.get("author") or "").strip()
-
-        name_l = name.lower()
-        desc_l = desc.lower()
-        author_l = author.lower()
-
-        score = 0.0
-        if name_l == q:
-            score += 500
-        if name_l.startswith(q):
-            score += 280
-        if q in name_l:
-            score += 180
-        if q in desc_l:
-            score += 90
-
-        for tok in tokens:
-            if tok in name_l:
-                score += 60
-            if tok in desc_l:
-                score += 20
-            if tok in author_l:
-                score += 10
-
-        stars = _parse_int_or_zero(e.get("stars"))
-        updated_at = _parse_int_or_zero(e.get("updatedAt"))
-        score += min(stars, 5000) / 250
-        if updated_at > 0:
-            score += 2
-
+        score = _score_skill_entry(q, tokens, e)
         if score <= 0:
             continue
 

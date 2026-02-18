@@ -1,0 +1,9 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.agent/
+logs/
+router_data/embeddings/
+workspace/
+skills-extra/

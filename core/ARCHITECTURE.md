@@ -18,8 +18,10 @@ This directory contains the runtime engine used by the CLI.
 - `summarization.py`: long output summarization.
 - `create_on_miss.py`: create-on-miss decision and orchestration.
 - `skill_executor.py`: bridge op execution (filesystem/terminal/web/uv).
+- `executor_utils.py`: shared executor parsing/canonicalization helpers.
 - `skill_resolver.py`: local skill lookup + dynamic fetch/install.
 - `skill_catalog.py`: catalog parsing, semantic indexing/ranking.
+  - `catalog_jsonl.py`: shared JSONL catalog parsing/normalization helpers.
   - router retriever methods: `tfidf` / `bm25` / `qwen` / `memento_qwen`
   - embedding cache precompute path: `router_data/embeddings/`
   - optional async prewarm on first route: `SEMANTIC_ROUTER_EMBED_PREWARM=1`

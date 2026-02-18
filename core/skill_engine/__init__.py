@@ -19,6 +19,19 @@ from core.skill_engine.skill_runner import (
     should_create_skill_on_miss,
     create_skill_on_miss,
 )
+from core.skill_engine.api import (
+    normalize_plan,
+    execute_plan,
+    execute_plan_result,
+    load_skills_block,
+    load_skills_block_from,
+    parse_skills,
+    build_skills_xml,
+    select_top_skills,
+    precompute_embedding_cache,
+    build_router_note,
+    derive_next_goal,
+)
 
 __all__ = [
     "ask_for_plan",
@@ -34,4 +47,15 @@ __all__ = [
     "_should_create_skill_on_miss_fallback",
     "should_create_skill_on_miss",
     "create_skill_on_miss",
+    "normalize_plan",
+    "execute_plan",
+    "execute_plan_result",
+    "load_skills_block",
+    "load_skills_block_from",
+    "parse_skills",
+    "build_skills_xml",
+    "select_top_skills",
+    "precompute_embedding_cache",
+    "build_router_note",
+    "derive_next_goal",
 ]

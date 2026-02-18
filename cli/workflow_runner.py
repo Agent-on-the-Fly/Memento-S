@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import json
+import re
 import time
+from pathlib import Path
+from typing import Any
 
+from core.config import PROJECT_ROOT
 from core.llm import openrouter_messages
 import core.router as router_module
 from core.skill_engine.skill_catalog import (
+    build_available_skills_xml,
     build_router_step_note,
     derive_semantic_goal,
     load_available_skills_block,
@@ -26,53 +31,57 @@ from core.skill_engine.skill_runner import (
 )
 
 _CONVERSATION_CONTEXT_MAX_TOKENS = 80000
+_FORMAT_ERROR_PATTERNS = (
+    "Invalid skill plan (refused)",
+    "ERR: plan contained no tool_calls",
+    "ERR: exceeded max_rounds",
+    "Invalid plan: received type=code",
+    "Missing tool_calls",
+    "tool_call missing required function.name",
+    "missing required key 'type'",
+    "KeyError: 'type'",
+    "Unknown operation type",
+    "unknown operation type",
+    "operation type: None",
+    "op_type is None",
+    "unsupported operation",
+    "invalid operation",
+    "Error in None:",
+    "TypeError: 'NoneType'",
+)
+_SKILL_EXEC_ERROR_PATTERNS = (
+    "Unknown operation type",
+    "unknown operation type",
+    "Unsupported operation",
+    "Invalid operation",
+    "operation type: None",
+    "Error in ",
+    "missing required",
+    "KeyError:",
+    "TypeError:",
+    "ValueError:",
+    "AttributeError:",
+    "FileNotFoundError:",
+    "PermissionError:",
+)
+
+
+def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
+    return any(p in text for p in patterns)
 
 
 def _is_likely_format_error(output: str) -> bool:
     s = (output or "").strip()
     if not s:
         return False
-    needles = [
-        "Invalid skill plan (refused)",
-        "ERR: plan contained no tool_calls",
-        "ERR: exceeded max_rounds",
-        "Invalid plan: received type=code",
-        "Missing tool_calls",
-        "tool_call missing required function.name",
-        "missing required key 'type'",
-        "KeyError: 'type'",
-        "Unknown operation type",
-        "unknown operation type",
-        "operation type: None",
-        "op_type is None",
-        "unsupported operation",
-        "invalid operation",
-        "Error in None:",
-        "TypeError: 'NoneType'",
-    ]
-    return any(n in s for n in needles)
+    return _contains_any(s, _FORMAT_ERROR_PATTERNS)
 
 
 def _is_skill_execution_error(output: str) -> bool:
     s = (output or "").strip()
     if not s:
         return False
-    error_patterns = [
-        "Unknown operation type",
-        "unknown operation type",
-        "Unsupported operation",
-        "Invalid operation",
-        "operation type: None",
-        "Error in ",
-        "missing required",
-        "KeyError:",
-        "TypeError:",
-        "ValueError:",
-        "AttributeError:",
-        "FileNotFoundError:",
-        "PermissionError:",
-    ]
-    return any(p in s for p in error_patterns)
+    return _contains_any(s, _SKILL_EXEC_ERROR_PATTERNS)
 
 
 def _should_optimize_skill(output: str) -> bool:
@@ -152,15 +161,13 @@ class SkillWorkflowRunner:
         # auto_sync reserved for compatibility; no-op in CLI runner.
         _ = auto_sync
 
+        self.skills_xml = ""
+        self.skills = []
+        self.skill_names = set()
         try:
-            self.skills_xml = load_available_skills_block()
-            self.skills = parse_available_skills(self.skills_xml)
-            self.skill_names = {s.get("name") for s in self.skills if isinstance(s, dict) and s.get("name")}
+            self.reload_skills_metadata()
         except Exception as exc:
             print(f"Warning: Failed to load skills: {exc}")
-            self.skills_xml = ""
-            self.skills = []
-            self.skill_names = set()
 
         self.context: list[str] = []
         self.conversation_history: list[dict] = []
@@ -194,10 +201,91 @@ class SkillWorkflowRunner:
         elapsed = max(0.0, time.perf_counter() - float(started_at))
         print(f"[debug][timing] {label}: {elapsed:.3f}s")
 
+    @staticmethod
+    def _extract_skill_description_from_md(skill_md_path: Path) -> str:
+        try:
+            text = skill_md_path.read_text(encoding="utf-8")
+        except Exception:
+            return ""
+        for raw in text.splitlines():
+            line = str(raw or "").strip()
+            if not line:
+                continue
+            if line.startswith("#") or line.startswith("```") or line.startswith("<"):
+                continue
+            if line.startswith("-") or line.startswith("*"):
+                continue
+            cleaned = re.sub(r"\s+", " ", line).strip()
+            if cleaned:
+                return cleaned[:260]
+        return ""
+
+    def _load_skill_extra_skills(self) -> list[dict[str, Any]]:
+        root = (PROJECT_ROOT / "skill_extra").resolve()
+        if not root.exists() or not root.is_dir():
+            return []
+
+        out: list[dict[str, Any]] = []
+        try:
+            entries = sorted(
+                [p for p in root.iterdir() if p.is_dir()],
+                key=lambda p: p.name.lower(),
+            )
+        except Exception:
+            return []
+
+        for skill_dir in entries:
+            skill_md = skill_dir / "SKILL.md"
+            if not skill_md.exists():
+                continue
+            name = str(skill_dir.name or "").strip()
+            if not name:
+                continue
+            desc = self._extract_skill_description_from_md(skill_md)
+            if not desc:
+                desc = f"Local skill from skill_extra/{name}"
+            out.append(
+                {
+                    "name": name,
+                    "description": desc,
+                    "_source": "skill_extra",
+                    "_path": str(skill_dir),
+                }
+            )
+        return out
+
     def reload_skills_metadata(self) -> None:
-        self.skills_xml = load_available_skills_block()
-        self.skills = parse_available_skills(self.skills_xml)
-        self.skill_names = {s.get("name") for s in self.skills if isinstance(s, dict) and s.get("name")}
+        base_xml = load_available_skills_block()
+        base_skills = parse_available_skills(base_xml)
+        extra_skills = self._load_skill_extra_skills()
+
+        merged: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+        for source in (base_skills, extra_skills):
+            for raw in source:
+                if not isinstance(raw, dict):
+                    continue
+                name = str(raw.get("name") or "").strip()
+                if not name or name in seen_names:
+                    continue
+                merged.append(dict(raw))
+                seen_names.add(name)
+
+        self.skills = merged
+        self.skills_xml = build_available_skills_xml(merged)
+        self.skill_names = {
+            s.get("name")
+            for s in self.skills
+            if isinstance(s, dict) and s.get("name")
+        }
+
+    def _reload_skills_metadata_safe(self, timing_label: str) -> None:
+        try:
+            t = time.perf_counter()
+            self.reload_skills_metadata()
+            self._debug_timing(timing_label, t)
+        except Exception:
+            pass
 
     def has_skills(self) -> bool:
         return bool(self.skills)
@@ -217,6 +305,133 @@ class SkillWorkflowRunner:
 
     def set_conversation_history(self, messages: list[dict]) -> None:
         self.conversation_history = list(messages) if messages else []
+
+    @staticmethod
+    def _history_to_parts(messages: list[dict]) -> list[str]:
+        parts: list[str] = []
+        for msg in messages:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            if isinstance(content, str) and content.strip():
+                parts.append(f"[{role}]: {content}")
+        return parts
+
+    def _ensure_skill_ready(self, skill_name: str, *, step_num: int) -> tuple[bool, str]:
+        if skill_name in self.skill_names or has_local_skill_dir(skill_name):
+            return True, ""
+
+        t = time.perf_counter()
+        ok, fetch_msg = ensure_skill_available(skill_name)
+        self._debug_timing(f"ensure_skill_available(step={step_num}, skill={skill_name})", t)
+        if not ok:
+            return False, fetch_msg
+
+        self.skill_names.add(skill_name)
+        self._reload_skills_metadata_safe(f"reload_skills_metadata(post-fetch-step-{step_num})")
+        return True, ""
+
+    def _run_skill_with_optimization(
+        self,
+        *,
+        step_num: int,
+        skill_name: str,
+        run_input: str,
+        user_text: str,
+        step_user_for_optimizer: str,
+    ) -> tuple[str, dict | None, list[tuple[dict[str, Any], str]]]:
+        events: list[tuple[dict[str, Any], str]] = []
+
+        t = time.perf_counter()
+        result, last_plan = run_skill_once_with_plan(run_input, skill_name, max_rounds=50)
+        self._debug_timing(f"run_skill_once(step={step_num}, skill={skill_name})", t)
+
+        if self.optimize_on_error and self.optimize_attempts > 0 and _should_optimize_skill(result):
+            for attempt in range(1, self.optimize_attempts + 1):
+                events.append(
+                    (
+                        {
+                            "step_num": step_num,
+                            "skill_name": skill_name,
+                            "status": "optimizing",
+                            "attempt": attempt,
+                            "is_final": False,
+                        },
+                        result,
+                    )
+                )
+                t = time.perf_counter()
+                ok, report = optimize_skill_with_creator(
+                    skill_name,
+                    user_text=user_text,
+                    step_user=step_user_for_optimizer,
+                    error_output=result,
+                    last_plan=last_plan,
+                )
+                self._debug_timing(
+                    f"optimize_skill_with_creator(step={step_num}, skill={skill_name}, attempt={attempt})",
+                    t,
+                )
+                events.append(
+                    (
+                        {
+                            "step_num": step_num,
+                            "skill_name": skill_name,
+                            "status": "optimized",
+                            "attempt": attempt,
+                            "ok": ok,
+                            "is_final": False,
+                        },
+                        report,
+                    )
+                )
+                if not ok:
+                    break
+
+                self._reload_skills_metadata_safe(f"reload_skills_metadata(post-optimize-step-{step_num})")
+                t = time.perf_counter()
+                result, last_plan = run_skill_once_with_plan(run_input, skill_name, max_rounds=50)
+                self._debug_timing(
+                    f"run_skill_once(step={step_num}-retry, skill={skill_name}, attempt={attempt})",
+                    t,
+                )
+                if not _should_optimize_skill(result):
+                    break
+
+        return result, last_plan, events
+
+    def _post_skill_creator_sync(
+        self,
+        *,
+        step_num: int,
+        executed_skill_name: str,
+        step_result: str,
+        last_plan: dict | None,
+    ) -> str:
+        if str(executed_skill_name or "").strip() != "skill-creator":
+            return step_result
+        if not isinstance(last_plan, dict):
+            return step_result
+
+        action = str(last_plan.get("action") or "").strip().lower()
+        target_skill = str(last_plan.get("skill_name") or "").strip()
+        if action not in {"create", "update"} or not target_skill:
+            return step_result
+
+        text = str(step_result or "").strip()
+        if text.startswith("ERR:"):
+            return step_result
+
+        self._reload_skills_metadata_safe(
+            f"reload_skills_metadata(post-skill-creator-step-{step_num})"
+        )
+        if has_local_skill_dir(target_skill):
+            note = f"[skill-creator sync] loaded `{target_skill}` from local skill roots"
+        else:
+            note = f"[skill-creator sync warning] `{target_skill}` not found after reload"
+
+        if text:
+            return f"{text}\n{note}"
+        return note
 
     def _summarize_conversation(self, text: str, max_tokens: int = 500) -> str:
         try:
@@ -258,12 +473,7 @@ Return ONLY the summary, no meta-commentary."""
             self._debug_timing("build_conversation_context(empty)", t_ctx)
             return ""
 
-        parts: list[str] = []
-        for msg in self.conversation_history:
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")
-            if isinstance(content, str) and content.strip():
-                parts.append(f"[{role}]: {content}")
+        parts = self._history_to_parts(self.conversation_history)
 
         if not parts:
             self._debug_timing("build_conversation_context(no_parts)", t_ctx)
@@ -278,24 +488,14 @@ Return ONLY the summary, no meta-commentary."""
         older_messages = self.conversation_history[:-recent_count] if recent_count < len(self.conversation_history) else []
         recent_messages = self.conversation_history[-recent_count:]
 
-        recent_parts: list[str] = []
-        for msg in recent_messages:
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")
-            if isinstance(content, str) and content.strip():
-                recent_parts.append(f"[{role}]: {content}")
+        recent_parts = self._history_to_parts(recent_messages)
         recent_text = "\n\n".join(recent_parts)
 
         if not older_messages:
             self._debug_timing("build_conversation_context(recent_only)", t_ctx)
             return f"\n\n=== CONVERSATION HISTORY ===\n{recent_text}\n=== END CONVERSATION ===\n"
 
-        older_parts: list[str] = []
-        for msg in older_messages:
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")
-            if isinstance(content, str) and content.strip():
-                older_parts.append(f"[{role}]: {content}")
+        older_parts = self._history_to_parts(older_messages)
         older_text = "\n\n".join(older_parts)
 
         remaining_tokens = max(500, max_tokens - count_approx_tokens(recent_text) - 200)
@@ -312,12 +512,7 @@ Return ONLY the summary, no meta-commentary."""
     def run_workflow_steps(self, user_text: str, max_steps: int = 20):
         """Yield step events as (step_info, result)."""
         t_workflow = time.perf_counter()
-        try:
-            t = time.perf_counter()
-            self.reload_skills_metadata()
-            self._debug_timing("reload_skills_metadata(start)", t)
-        except Exception:
-            pass
+        self._reload_skills_metadata_safe("reload_skills_metadata(start)")
 
         if not self.skills:
             yield {"step_num": 0, "skill_name": None, "status": "no_skills", "is_final": True}, ""
@@ -331,13 +526,6 @@ Return ONLY the summary, no meta-commentary."""
         if conversation_context:
             enriched_user_text = f"{user_text}\n{conversation_context}"
 
-        try:
-            t = time.perf_counter()
-            self.reload_skills_metadata()
-            self._debug_timing("reload_skills_metadata(pre-route-1)", t)
-        except Exception:
-            pass
-
         current_goal = user_text
         self._debug_print_router_skills(1)
         t = time.perf_counter()
@@ -350,12 +538,7 @@ Return ONLY the summary, no meta-commentary."""
         )
         self._debug_timing("route_skill(round=1)", t)
 
-        try:
-            t = time.perf_counter()
-            self.reload_skills_metadata()
-            self._debug_timing("reload_skills_metadata(post-route-1)", t)
-        except Exception:
-            pass
+        self._reload_skills_metadata_safe("reload_skills_metadata(post-route-1)")
 
         action = decision.get("action")
         if action == "none":
@@ -397,26 +580,16 @@ Return ONLY the summary, no meta-commentary."""
             self._debug_timing("workflow_total", t_workflow)
             return
 
-        if skill_name not in self.skill_names and not has_local_skill_dir(skill_name):
-            t = time.perf_counter()
-            ok, fetch_msg = ensure_skill_available(skill_name)
-            self._debug_timing(f"ensure_skill_available(step=1, skill={skill_name})", t)
-            if not ok:
-                yield {
-                    "step_num": 1,
-                    "skill_name": skill_name,
-                    "status": "error",
-                    "is_final": True,
-                }, f"Unknown skill: {skill_name} ({fetch_msg})"
-                self._debug_timing("workflow_total", t_workflow)
-                return
-            self.skill_names.add(skill_name)
-            try:
-                t = time.perf_counter()
-                self.reload_skills_metadata()
-                self._debug_timing("reload_skills_metadata(post-fetch-step-1)", t)
-            except Exception:
-                pass
+        ok, fetch_msg = self._ensure_skill_ready(skill_name, step_num=1)
+        if not ok:
+            yield {
+                "step_num": 1,
+                "skill_name": skill_name,
+                "status": "error",
+                "is_final": True,
+            }, f"Unknown skill: {skill_name} ({fetch_msg})"
+            self._debug_timing("workflow_total", t_workflow)
+            return
 
         step_user = decision.get("user") or user_text
         yield {"step_num": 1, "skill_name": skill_name, "status": "running", "is_final": False}, None
@@ -425,55 +598,21 @@ Return ONLY the summary, no meta-commentary."""
         if conversation_context:
             step_user_text = f"{step_user_text}\n{conversation_context}"
 
-        t = time.perf_counter()
-        result, last_plan = run_skill_once_with_plan(step_user_text, skill_name, max_rounds=50)
-        self._debug_timing(f"run_skill_once(step=1, skill={skill_name})", t)
-
-        if self.optimize_on_error and self.optimize_attempts > 0 and _should_optimize_skill(result):
-            for attempt in range(1, self.optimize_attempts + 1):
-                yield {
-                    "step_num": 1,
-                    "skill_name": skill_name,
-                    "status": "optimizing",
-                    "attempt": attempt,
-                    "is_final": False,
-                }, result
-                t = time.perf_counter()
-                ok, report = optimize_skill_with_creator(
-                    skill_name,
-                    user_text=user_text,
-                    step_user=step_user_text,
-                    error_output=result,
-                    last_plan=last_plan,
-                )
-                self._debug_timing(
-                    f"optimize_skill_with_creator(step=1, skill={skill_name}, attempt={attempt})",
-                    t,
-                )
-                yield {
-                    "step_num": 1,
-                    "skill_name": skill_name,
-                    "status": "optimized",
-                    "attempt": attempt,
-                    "ok": ok,
-                    "is_final": False,
-                }, report
-                if not ok:
-                    break
-                try:
-                    t = time.perf_counter()
-                    self.reload_skills_metadata()
-                    self._debug_timing("reload_skills_metadata(post-optimize-step-1)", t)
-                except Exception:
-                    pass
-                t = time.perf_counter()
-                result, last_plan = run_skill_once_with_plan(step_user_text, skill_name, max_rounds=50)
-                self._debug_timing(
-                    f"run_skill_once(step=1-retry, skill={skill_name}, attempt={attempt})",
-                    t,
-                )
-                if not _should_optimize_skill(result):
-                    break
+        result, _last_plan, opt_events = self._run_skill_with_optimization(
+            step_num=1,
+            skill_name=skill_name,
+            run_input=step_user_text,
+            user_text=user_text,
+            step_user_for_optimizer=step_user_text,
+        )
+        result = self._post_skill_creator_sync(
+            step_num=1,
+            executed_skill_name=skill_name,
+            step_result=result,
+            last_plan=_last_plan,
+        )
+        for event, event_result in opt_events:
+            yield event, event_result
 
         yield {"step_num": 1, "skill_name": skill_name, "status": "completed", "is_final": False}, result
 
@@ -499,12 +638,7 @@ Return ONLY the summary, no meta-commentary."""
         self._debug_timing("derive_semantic_goal(step=1)", t)
 
         for step_num in range(2, max_steps + 1):
-            try:
-                t = time.perf_counter()
-                self.reload_skills_metadata()
-                self._debug_timing(f"reload_skills_metadata(pre-route-step-{step_num})", t)
-            except Exception:
-                pass
+            self._reload_skills_metadata_safe(f"reload_skills_metadata(pre-route-step-{step_num})")
 
             self._debug_print_router_skills(step_num)
             t = time.perf_counter()
@@ -518,12 +652,7 @@ Return ONLY the summary, no meta-commentary."""
             )
             self._debug_timing(f"route_skill(round={step_num})", t)
 
-            try:
-                t = time.perf_counter()
-                self.reload_skills_metadata()
-                self._debug_timing(f"reload_skills_metadata(post-route-step-{step_num})", t)
-            except Exception:
-                pass
+            self._reload_skills_metadata_safe(f"reload_skills_metadata(post-route-step-{step_num})")
 
             next_action = next_decision.get("action")
             if next_action == "done":
@@ -572,26 +701,16 @@ Return ONLY the summary, no meta-commentary."""
                 self._debug_timing("workflow_total", t_workflow)
                 return
 
-            if next_name not in self.skill_names and not has_local_skill_dir(next_name):
-                t = time.perf_counter()
-                ok, fetch_msg = ensure_skill_available(next_name)
-                self._debug_timing(f"ensure_skill_available(step={step_num}, skill={next_name})", t)
-                if not ok:
-                    yield {
-                        "step_num": step_num,
-                        "skill_name": next_name,
-                        "status": "error",
-                        "is_final": True,
-                    }, f"Unknown skill: {next_name} ({fetch_msg})"
-                    self._debug_timing("workflow_total", t_workflow)
-                    return
-                self.skill_names.add(next_name)
-                try:
-                    t = time.perf_counter()
-                    self.reload_skills_metadata()
-                    self._debug_timing(f"reload_skills_metadata(post-fetch-step-{step_num})", t)
-                except Exception:
-                    pass
+            ok, fetch_msg = self._ensure_skill_ready(next_name, step_num=step_num)
+            if not ok:
+                yield {
+                    "step_num": step_num,
+                    "skill_name": next_name,
+                    "status": "error",
+                    "is_final": True,
+                }, f"Unknown skill: {next_name} ({fetch_msg})"
+                self._debug_timing("workflow_total", t_workflow)
+                return
 
             next_user = next_decision.get("user") or user_text
             yield {
@@ -605,55 +724,21 @@ Return ONLY the summary, no meta-commentary."""
             if conversation_context:
                 full_user = f"{full_user}\n{conversation_context}"
 
-            t = time.perf_counter()
-            result, last_plan = run_skill_once_with_plan(full_user, next_name, max_rounds=50)
-            self._debug_timing(f"run_skill_once(step={step_num}, skill={next_name})", t)
-
-            if self.optimize_on_error and self.optimize_attempts > 0 and _should_optimize_skill(result):
-                for attempt in range(1, self.optimize_attempts + 1):
-                    yield {
-                        "step_num": step_num,
-                        "skill_name": next_name,
-                        "status": "optimizing",
-                        "attempt": attempt,
-                        "is_final": False,
-                    }, result
-                    t = time.perf_counter()
-                    ok, report = optimize_skill_with_creator(
-                        next_name,
-                        user_text=user_text,
-                        step_user=full_user,
-                        error_output=result,
-                        last_plan=last_plan,
-                    )
-                    self._debug_timing(
-                        f"optimize_skill_with_creator(step={step_num}, skill={next_name}, attempt={attempt})",
-                        t,
-                    )
-                    yield {
-                        "step_num": step_num,
-                        "skill_name": next_name,
-                        "status": "optimized",
-                        "attempt": attempt,
-                        "ok": ok,
-                        "is_final": False,
-                    }, report
-                    if not ok:
-                        break
-                    try:
-                        t = time.perf_counter()
-                        self.reload_skills_metadata()
-                        self._debug_timing(f"reload_skills_metadata(post-optimize-step-{step_num})", t)
-                    except Exception:
-                        pass
-                    t = time.perf_counter()
-                    result, last_plan = run_skill_once_with_plan(full_user, next_name, max_rounds=50)
-                    self._debug_timing(
-                        f"run_skill_once(step={step_num}-retry, skill={next_name}, attempt={attempt})",
-                        t,
-                    )
-                    if not _should_optimize_skill(result):
-                        break
+            result, _last_plan, opt_events = self._run_skill_with_optimization(
+                step_num=step_num,
+                skill_name=next_name,
+                run_input=full_user,
+                user_text=user_text,
+                step_user_for_optimizer=full_user,
+            )
+            result = self._post_skill_creator_sync(
+                step_num=step_num,
+                executed_skill_name=next_name,
+                step_result=result,
+                last_plan=_last_plan,
+            )
+            for event, event_result in opt_events:
+                yield event, event_result
 
             yield {
                 "step_num": step_num,

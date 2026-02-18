@@ -8,7 +8,7 @@ from core.llm import openrouter_messages
 from core.utils.json_utils import parse_json_output
 from core.utils.logging_utils import log_event
 from core.skill_engine.execution import run_skill_once_with_plan
-from core.skill_engine.skill_resolver import has_local_skill_dir, install_or_update_skill
+from core.skill_engine.skill_resolver import has_local_skill_dir
 
 def _should_create_skill_on_miss_fallback(user_text: str) -> tuple[bool, str]:
     text = (user_text or "").strip()
@@ -81,6 +81,10 @@ def create_skill_on_miss(
 ) -> tuple[bool, str | None, str]:
     """
     Try to create a skill via skill-creator for a routing miss.
+
+    For local-first workflow, success is based on whether the skill becomes
+    readable from local skill roots after creation.
+
     Returns ``(created, skill_name, report)``.
     """
     names = [s for s in (available_skill_names or []) if isinstance(s, str) and s.strip()]
@@ -116,10 +120,7 @@ def create_skill_on_miss(
         return False, None, "skill-creator did not return a skill_name"
     skill_name = skill_name.strip()
 
-    ok, install_msg = install_or_update_skill(skill_name)
-    if not ok:
-        if has_local_skill_dir(skill_name):
-            return True, skill_name, f"{result}\n[warn] install/sync failed: {install_msg}"
-        return False, None, f"install/sync failed: {install_msg}"
+    if has_local_skill_dir(skill_name):
+        return True, skill_name, result or f"created skill {skill_name}"
 
-    return True, skill_name, result or f"created skill {skill_name}"
+    return False, None, f"skill created but local directory not found: {skill_name}"

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import io
 import json
 import os
@@ -30,8 +29,8 @@ except Exception:
     KeyBindings = None  # type: ignore[assignment]
     PROMPT_TOOLKIT_AVAILABLE = False
 
-from core.config import CHAT_SYSTEM_PROMPT, CLI_CREATE_ON_MISS, DEBUG, PROJECT_ROOT
-from core.llm import openrouter_messages
+from core.config import CHAT_SYSTEM_PROMPT, CLI_CREATE_ON_MISS, DEBUG, PROJECT_ROOT, refresh_runtime_config
+from core.llm import openrouter_messages, reset_llm_call_budget
 from core.skill_engine.skill_runner import create_skill_on_miss
 from cli.skill_search import load_cloud_skill_catalog, search_cloud_skills
 from cli.workflow_runner import SkillWorkflowRunner
@@ -106,6 +105,7 @@ CONFIG_KEYS: tuple[str, ...] = (
     "SEMANTIC_ROUTER_EMBED_CACHE_DIR",
     "SEMANTIC_ROUTER_EMBED_PREWARM",
 )
+CONFIG_KEYS_SET = set(CONFIG_KEYS)
 CONFIG_SECRET_KEYS = {"OPENROUTER_API_KEY", "SERPAPI_API_KEY", "OPENAI_API_KEY"}
 CONFIG_ATTR_OVERRIDES = {"OPENROUTER_MODEL": "MODEL"}
 SLASH_COMMANDS: list[tuple[str, str]] = [
@@ -122,6 +122,7 @@ SLASH_COMMANDS: list[tuple[str, str]] = [
     ("/clear", "Clear conversation context/history"),
     ("/exit", "Exit the CLI"),
 ]
+KNOWN_SLASH_COMMANDS = {cmd.split()[0].strip() for cmd, _ in SLASH_COMMANDS if cmd.split()}
 
 
 class TurnInterrupted(Exception):
@@ -183,6 +184,16 @@ def _build_prompt_session():
         )
     except Exception:
         return None
+
+
+def _split_shell_tokens(text: str) -> list[str]:
+    raw = str(text or "").strip()
+    if not raw:
+        return []
+    try:
+        return shlex.split(raw)
+    except Exception:
+        return raw.split()
 
 
 def _sanitize_history_items(raw: Any) -> list[dict[str, str]]:
@@ -442,10 +453,7 @@ def _parse_skills_args(raw: str, *, default_limit: int = 5) -> tuple[str, int, s
     text = str(raw or "").strip()
     if not text:
         return "", default_limit, None
-    try:
-        tokens = shlex.split(text)
-    except Exception:
-        tokens = text.split()
+    tokens = _split_shell_tokens(text)
 
     limit = max(1, int(default_limit))
     query_tokens: list[str] = []
@@ -807,7 +815,7 @@ def _normalize_config_key(raw: str) -> str | None:
     if alias_hit:
         return alias_hit
     direct = token.upper()
-    if direct in set(CONFIG_KEYS):
+    if direct in CONFIG_KEYS_SET:
         return direct
     return None
 
@@ -837,17 +845,7 @@ def _effective_config_value(key: str) -> str:
 
 def _reload_runtime_config_modules() -> tuple[bool, str]:
     try:
-        import core.config as cfg
-        import core.llm as llm_mod
-        import core.skill_engine.skill_catalog as skill_catalog_mod
-        import core.router as router_mod
-        import cli.workflow_runner as workflow_runner_mod
-
-        importlib.reload(cfg)
-        importlib.reload(llm_mod)
-        importlib.reload(skill_catalog_mod)
-        importlib.reload(router_mod)
-        importlib.reload(workflow_runner_mod)
+        refresh_runtime_config(override=True)
         return True, ""
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
@@ -887,10 +885,7 @@ def _handle_config_command(raw_args: str, *, env_path: Path) -> None:
         _print_config_help()
         return
 
-    try:
-        tokens = shlex.split(text)
-    except Exception:
-        tokens = text.split()
+    tokens = _split_shell_tokens(text)
 
     if not tokens:
         _print_config_show(env_path)
@@ -1057,6 +1052,26 @@ def _extract_last_turn_fields(history: list[dict[str, str]]) -> tuple[str, str, 
     return last_user_request, last_reply, last_error
 
 
+def _append_history_turn(
+    history: list[dict[str, str]],
+    *,
+    user_text: str,
+    assistant_text: str,
+    limit: int = SESSION_MESSAGE_LIMIT,
+) -> None:
+    text = str(assistant_text or "").strip()
+    if not text:
+        return
+    history.extend(
+        [
+            {"role": "user", "content": str(user_text or "")},
+            {"role": "assistant", "content": text},
+        ]
+    )
+    if len(history) > int(limit):
+        history[:] = history[-int(limit):]
+
+
 def _flush_captured(stdout_buf: io.StringIO, stderr_buf: io.StringIO, *, debug: bool) -> None:
     if not debug:
         return
@@ -1152,6 +1167,41 @@ def _execute_turn(
             print(f"[debug][timing] {label}: {time.perf_counter() - t_turn:.3f}s")
         return value
 
+    def _try_create_on_miss(
+        router_reason: str,
+        *,
+        start_message: str,
+        timing_label: str,
+        debug_label: str,
+    ) -> bool:
+        if not create_on_miss:
+            return False
+
+        print(start_message)
+        t_creator = time.perf_counter()
+        created, created_skill, report = _run_quiet_call(
+            lambda: create_skill_on_miss(
+                user_text,
+                router_reason=router_reason or None,
+                available_skill_names=runner.get_skill_names(),
+            ),
+            debug=debug,
+        )
+        if debug:
+            print(f"[debug][timing] {timing_label}: {time.perf_counter() - t_creator:.3f}s")
+        if created and isinstance(created_skill, str) and created_skill.strip():
+            print(f"Tool> router: created skill `{created_skill.strip()}`, retrying request")
+            try:
+                runner.reload_skills_metadata()
+            except Exception as exc:
+                if debug:
+                    print(f"[debug] reload_skills_metadata failed: {exc}")
+            return True
+        if debug and report:
+            print(f"[debug] {debug_label} skipped/failed: {report}")
+        return False
+
+    reset_llm_call_budget()
     runner.set_conversation_history(history)
     last_assistant = ""
     try:
@@ -1216,33 +1266,14 @@ def _execute_turn(
 
                     if status == "no_match":
                         reason = str(step_info.get("reason") or "").strip()
-                        if create_on_miss:
-                            print("Tool> router: no matching skill, trying skill-creator")
-                            t_creator = time.perf_counter()
-                            created, created_skill, report = _run_quiet_call(
-                                lambda: create_skill_on_miss(
-                                    user_text,
-                                    router_reason=reason or None,
-                                    available_skill_names=runner.get_skill_names(),
-                                ),
-                                debug=debug,
-                            )
-                            if debug:
-                                print(
-                                    "[debug][timing] create_on_miss: "
-                                    f"{time.perf_counter() - t_creator:.3f}s"
-                                )
-                            if created and isinstance(created_skill, str) and created_skill.strip():
-                                print(f"Tool> router: created skill `{created_skill.strip()}`, retrying request")
-                                try:
-                                    runner.reload_skills_metadata()
-                                except Exception as exc:
-                                    if debug:
-                                        print(f"[debug] reload_skills_metadata failed: {exc}")
-                                should_retry = True
-                                break
-                            if debug and report:
-                                print(f"[debug] create_on_miss skipped/failed: {report}")
+                        if _try_create_on_miss(
+                            reason,
+                            start_message="Tool> router: no matching skill, trying skill-creator",
+                            timing_label="create_on_miss",
+                            debug_label="create_on_miss",
+                        ):
+                            should_retry = True
+                            break
                         fallback = _chat_fallback(user_text, history, debug=debug)
                         print(f"Assistant> {fallback}\n")
                         return _return_with_timing(fallback)
@@ -1254,33 +1285,14 @@ def _execute_turn(
 
                     if status == "error":
                         text = str(result or "Skill execution error").strip()
-                        if create_on_miss and text.startswith("Unknown skill:"):
-                            print("Tool> skill unavailable, trying skill-creator")
-                            t_creator = time.perf_counter()
-                            created, created_skill, report = _run_quiet_call(
-                                lambda: create_skill_on_miss(
-                                    user_text,
-                                    router_reason=text,
-                                    available_skill_names=runner.get_skill_names(),
-                                ),
-                                debug=debug,
-                            )
-                            if debug:
-                                print(
-                                    "[debug][timing] create_on_miss(on_error): "
-                                    f"{time.perf_counter() - t_creator:.3f}s"
-                                )
-                            if created and isinstance(created_skill, str) and created_skill.strip():
-                                print(f"Tool> router: created skill `{created_skill.strip()}`, retrying request")
-                                try:
-                                    runner.reload_skills_metadata()
-                                except Exception as exc:
-                                    if debug:
-                                        print(f"[debug] reload_skills_metadata failed: {exc}")
-                                should_retry = True
-                                break
-                            if debug and report:
-                                print(f"[debug] create_on_miss(on_error) skipped/failed: {report}")
+                        if text.startswith("Unknown skill:") and _try_create_on_miss(
+                            text,
+                            start_message="Tool> skill unavailable, trying skill-creator",
+                            timing_label="create_on_miss(on_error)",
+                            debug_label="create_on_miss(on_error)",
+                        ):
+                            should_retry = True
+                            break
                         print(f"Assistant> {text}\n")
                         return _return_with_timing(text)
 
@@ -1401,14 +1413,12 @@ def main(argv: list[str] | None = None) -> int:
         last_reply = str(reply_text or "").strip()
         last_error = last_reply if last_reply.startswith("ERR:") else ""
         if last_reply:
-            history.extend(
-                [
-                    {"role": "user", "content": request_text},
-                    {"role": "assistant", "content": last_reply},
-                ]
+            _append_history_turn(
+                history,
+                user_text=request_text,
+                assistant_text=last_reply,
+                limit=SESSION_MESSAGE_LIMIT,
             )
-            if len(history) > SESSION_MESSAGE_LIMIT:
-                history[:] = history[-SESSION_MESSAGE_LIMIT:]
 
             if not str(active_session.get("title") or "").strip():
                 active_session["title"] = _build_session_title(request_text)
@@ -1540,20 +1550,7 @@ def main(argv: list[str] | None = None) -> int:
             raw_args = cmd[1] if len(cmd) > 1 else ""
             _handle_config_command(raw_args, env_path=env_file)
             continue
-        if cmd and cmd[0].startswith("/") and cmd[0] not in {
-            "/exit",
-            "/quit",
-            "/help",
-            "/status",
-            "/retry",
-            "/continue",
-            "/last",
-            "/skills",
-            "/prewarm",
-            "/config",
-            "/history",
-            "/clear",
-        }:
+        if cmd and cmd[0].startswith("/") and cmd[0] not in KNOWN_SLASH_COMMANDS:
             _print_slash_suggestions(cmd[0])
             continue
         if cmd and cmd[0] in HISTORY_COMMANDS:
@@ -1565,10 +1562,7 @@ def main(argv: list[str] | None = None) -> int:
             history_limit = 12
             if len(cmd) > 1:
                 raw_arg = cmd[1].strip()
-                try:
-                    history_tokens = shlex.split(raw_arg)
-                except Exception:
-                    history_tokens = raw_arg.split()
+                history_tokens = _split_shell_tokens(raw_arg)
 
                 if history_tokens and str(history_tokens[0]).strip().lower() == "load":
                     if len(history_tokens) != 2:

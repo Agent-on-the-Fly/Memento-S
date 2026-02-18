@@ -1,6 +1,8 @@
 """LLM API client functions for OpenRouter and Anthropic-compatible endpoints."""
 
+from contextvars import ContextVar
 import json
+import os
 import ssl
 import time
 import urllib.error
@@ -10,6 +12,8 @@ from typing import Any
 
 from core.config import (
     LLM_API,
+    LLM_ENFORCE_CALL_BUDGET,
+    LLM_MAX_CALLS_PER_TURN,
     MODEL,
     OPENROUTER_ALLOW_FALLBACKS,
     OPENROUTER_API_KEY,
@@ -24,6 +28,67 @@ from core.config import (
     OPENROUTER_TIMEOUT,
 )
 from core.utils.logging_utils import log_event
+
+_LLM_CALL_BUDGET: ContextVar[int | None] = ContextVar("llm_call_budget", default=None)
+
+
+def _runtime_str(name: str, fallback: str | None = None) -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return str(fallback or "").strip()
+    return str(raw).strip()
+
+
+def _runtime_int(name: str, fallback: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return int(fallback)
+    try:
+        return int(str(raw).strip())
+    except Exception:
+        return int(fallback)
+
+
+def _runtime_float(name: str, fallback: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return float(fallback)
+    try:
+        return float(str(raw).strip())
+    except Exception:
+        return float(fallback)
+
+
+def _runtime_flag(name: str, fallback: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return bool(fallback)
+    return str(raw).strip().lower() not in {"0", "false", "no", "off"}
+
+
+def reset_llm_call_budget(limit: int | None = None) -> None:
+    """Reset per-turn LLM call budget."""
+    if not _runtime_flag("LLM_ENFORCE_CALL_BUDGET", LLM_ENFORCE_CALL_BUDGET):
+        _LLM_CALL_BUDGET.set(None)
+        return
+    if limit is None:
+        limit = max(1, _runtime_int("LLM_MAX_CALLS_PER_TURN", LLM_MAX_CALLS_PER_TURN))
+    _LLM_CALL_BUDGET.set(max(0, int(limit)))
+
+
+def get_llm_call_budget() -> int | None:
+    return _LLM_CALL_BUDGET.get()
+
+
+def _consume_llm_call_budget() -> None:
+    if not _runtime_flag("LLM_ENFORCE_CALL_BUDGET", LLM_ENFORCE_CALL_BUDGET):
+        return
+    remaining = _LLM_CALL_BUDGET.get()
+    if remaining is None:
+        remaining = max(1, _runtime_int("LLM_MAX_CALLS_PER_TURN", LLM_MAX_CALLS_PER_TURN))
+    if remaining <= 0:
+        raise RuntimeError("LLM call budget exceeded for current turn")
+    _LLM_CALL_BUDGET.set(remaining - 1)
 
 
 # ---------------------------------------------------------------------------
@@ -61,9 +126,13 @@ def _http_request_with_retry(
             body = exc.read().decode("utf-8") if exc.fp else ""
             if exc.code in (429, 500, 502, 503, 529) and attempt < retries:
                 wait_time = backoff * attempt * 2
-                print(
-                    f"[Rate limit {exc.code}] Retrying in {wait_time}s... "
-                    f"(attempt {attempt}/{retries})"
+                log_event(
+                    "llm_retry_wait",
+                    provider=provider_label,
+                    http_status=exc.code,
+                    attempt=attempt,
+                    retries=retries,
+                    wait_time_sec=wait_time,
                 )
                 time.sleep(wait_time)
                 continue
@@ -97,9 +166,22 @@ def _normalize_openrouter_base(url: str) -> str:
 
 def _openrouter_chat_completions(system: str, messages: list[dict]) -> str:
     """Send a chat completion request via the OpenRouter API."""
-    if not OPENROUTER_API_KEY:
+    model = _runtime_str("OPENROUTER_MODEL", MODEL)
+    api_key = _runtime_str("OPENROUTER_API_KEY", OPENROUTER_API_KEY or "")
+    base_url = _runtime_str("OPENROUTER_BASE_URL", OPENROUTER_BASE_URL)
+    max_tokens = _runtime_int("OPENROUTER_MAX_TOKENS", OPENROUTER_MAX_TOKENS)
+    provider = _runtime_str("OPENROUTER_PROVIDER", OPENROUTER_PROVIDER)
+    provider_order_raw = _runtime_str("OPENROUTER_PROVIDER_ORDER", OPENROUTER_PROVIDER_ORDER)
+    allow_fallbacks = _runtime_flag("OPENROUTER_ALLOW_FALLBACKS", OPENROUTER_ALLOW_FALLBACKS)
+    site_url = _runtime_str("OPENROUTER_SITE_URL", OPENROUTER_SITE_URL)
+    app_name = _runtime_str("OPENROUTER_APP_NAME", OPENROUTER_APP_NAME)
+    retries = _runtime_int("OPENROUTER_RETRIES", OPENROUTER_RETRIES)
+    backoff = _runtime_float("OPENROUTER_RETRY_BACKOFF", OPENROUTER_RETRY_BACKOFF)
+    timeout = _runtime_int("OPENROUTER_TIMEOUT", OPENROUTER_TIMEOUT)
+
+    if not api_key:
         raise RuntimeError("Missing OPENROUTER_API_KEY in environment")
-    base = _normalize_openrouter_base(OPENROUTER_BASE_URL)
+    base = _normalize_openrouter_base(base_url)
     url = f"{base}/chat/completions"
 
     oai_messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
@@ -115,32 +197,40 @@ def _openrouter_chat_completions(system: str, messages: list[dict]) -> str:
         oai_messages.append({"role": role, "content": text})
 
     payload: dict[str, Any] = {
-        "model": MODEL,
-        "max_tokens": OPENROUTER_MAX_TOKENS,
+        "model": model,
+        "max_tokens": max_tokens,
         "messages": oai_messages,
     }
     provider_order: list[str] = []
-    if OPENROUTER_PROVIDER_ORDER:
-        provider_order = [p.strip() for p in OPENROUTER_PROVIDER_ORDER.split(",") if p.strip()]
-    elif OPENROUTER_PROVIDER:
-        provider_order = [OPENROUTER_PROVIDER]
+    if provider_order_raw:
+        provider_order = [p.strip() for p in provider_order_raw.split(",") if p.strip()]
+    elif provider:
+        provider_order = [provider]
     if provider_order:
         payload["provider"] = {
             "order": provider_order,
-            "allow_fallbacks": OPENROUTER_ALLOW_FALLBACKS,
+            "allow_fallbacks": allow_fallbacks,
         }
 
     data = json.dumps(payload).encode("utf-8")
     headers: dict[str, str] = {
         "content-type": "application/json",
-        "authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "authorization": f"Bearer {api_key}",
     }
-    if OPENROUTER_SITE_URL:
-        headers["HTTP-Referer"] = OPENROUTER_SITE_URL
-    if OPENROUTER_APP_NAME:
-        headers["X-Title"] = OPENROUTER_APP_NAME
+    if site_url:
+        headers["HTTP-Referer"] = site_url
+    if app_name:
+        headers["X-Title"] = app_name
 
-    raw = _http_request_with_retry(url, data, headers, provider_label="OpenRouter API")
+    raw = _http_request_with_retry(
+        url,
+        data,
+        headers,
+        retries=retries,
+        backoff=backoff,
+        timeout=timeout,
+        provider_label="OpenRouter API",
+    )
 
     out = json.loads(raw or "{}")
     choices = out.get("choices") or []
@@ -171,39 +261,55 @@ def openrouter_messages(system: str, messages: list[dict]) -> str:
     Anthropic Messages API depending
     on the ``LLM_API`` config value.
     """
-    provider = (LLM_API or "").strip().lower()
+    _consume_llm_call_budget()
+    provider = _runtime_str("LLM_API", LLM_API).lower() or "openrouter"
+    model = _runtime_str("OPENROUTER_MODEL", MODEL)
     log_event(
         "llm_request",
         provider=provider or "openrouter",
-        model=MODEL,
+        model=model,
         system=system,
         messages=messages,
+        llm_budget_remaining=get_llm_call_budget(),
     )
     if provider in {"openrouter", "openai"}:
         out = _openrouter_chat_completions(system, messages)
-        log_event("llm_response", provider="openrouter", model=MODEL, output=out)
+        log_event("llm_response", provider="openrouter", model=model, output=out)
         return out
-    if not OPENROUTER_API_KEY:
+    api_key = _runtime_str("OPENROUTER_API_KEY", OPENROUTER_API_KEY or "")
+    if not api_key:
         raise RuntimeError("Missing OPENROUTER_API_KEY in environment")
-    base = OPENROUTER_BASE_URL.rstrip("/")
+    base = _runtime_str("OPENROUTER_BASE_URL", OPENROUTER_BASE_URL).rstrip("/")
+    max_tokens = _runtime_int("OPENROUTER_MAX_TOKENS", OPENROUTER_MAX_TOKENS)
+    retries = _runtime_int("OPENROUTER_RETRIES", OPENROUTER_RETRIES)
+    backoff = _runtime_float("OPENROUTER_RETRY_BACKOFF", OPENROUTER_RETRY_BACKOFF)
+    timeout = _runtime_int("OPENROUTER_TIMEOUT", OPENROUTER_TIMEOUT)
     url = f"{base}/v1/messages"
     payload = {
-        "model": MODEL,
-        "max_tokens": OPENROUTER_MAX_TOKENS,
+        "model": model,
+        "max_tokens": max_tokens,
         "system": system,
         "messages": messages,
     }
     data = json.dumps(payload).encode("utf-8")
     headers = {
         "content-type": "application/json",
-        "x-api-key": OPENROUTER_API_KEY,
+        "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
     }
 
-    raw = _http_request_with_retry(url, data, headers, provider_label="Anthropic API")
+    raw = _http_request_with_retry(
+        url,
+        data,
+        headers,
+        retries=retries,
+        backoff=backoff,
+        timeout=timeout,
+        provider_label="Anthropic API",
+    )
 
     out = json.loads(raw or "{}")
     parts = out.get("content", [])
     text = "".join(p.get("text", "") for p in parts if p.get("type") == "text")
-    log_event("llm_response", provider="anthropic", model=MODEL, output=text)
+    log_event("llm_response", provider="anthropic", model=model, output=text)
     return text

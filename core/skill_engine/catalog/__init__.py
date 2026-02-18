@@ -1,23 +1,12 @@
-"""Backwards-compatible facade for split catalog modules."""
+"""Catalog submodules split from skill_catalog.py."""
 
-from .catalog.catalog_cache import _ROUTER_STOPWORDS, _tokenize_for_semantic, _catalog_signature
-from .catalog.catalog_embedding import (
-    _resolve_embedding_paths,
-    _resolve_embedding_cache_file,
-    _get_model_device,
-    _last_token_pool,
-    _load_embedding_runtime,
-    _encode_texts_with_embedding,
-    _load_embedding_doc_cache,
-    _save_embedding_doc_cache,
-    _get_embedding_doc_matrix,
-    _prewarm_embedding_catalog_sync,
-    _router_method_to_embedding_methods,
+from .catalog_cache import _ROUTER_STOPWORDS, _tokenize_for_semantic, _catalog_signature
+from .catalog_embedding import (
     ensure_router_embedding_prewarm,
     precompute_router_embedding_cache,
     select_embedding_top_skills,
 )
-from .catalog.catalog_router import (
+from .catalog_router import (
     load_available_skills_block_from,
     load_available_skills_block,
     write_visible_skills_block,
@@ -26,8 +15,6 @@ from .catalog.catalog_router import (
     _build_semantic_index,
     _get_semantic_index,
     select_semantic_top_skills,
-    _resolve_forced_skills,
-    _append_forced_skills_and_fill,
     _tokenize_for_bm25,
     _build_bm25_index,
     _get_bm25_index,
@@ -44,34 +31,21 @@ from .catalog.catalog_router import (
 )
 
 __all__ = [
+    "_ROUTER_STOPWORDS",
+    "_tokenize_for_semantic",
+    "_catalog_signature",
     "load_available_skills_block_from",
     "load_available_skills_block",
     "write_visible_skills_block",
     "parse_available_skills",
     "build_available_skills_xml",
-    "_ROUTER_STOPWORDS",
-    "_tokenize_for_semantic",
-    "_catalog_signature",
     "_build_semantic_index",
     "_get_semantic_index",
     "select_semantic_top_skills",
-    "_resolve_forced_skills",
-    "_append_forced_skills_and_fill",
     "_tokenize_for_bm25",
     "_build_bm25_index",
     "_get_bm25_index",
     "select_bm25_top_skills",
-    "_resolve_embedding_paths",
-    "_resolve_embedding_cache_file",
-    "_get_model_device",
-    "_last_token_pool",
-    "_load_embedding_runtime",
-    "_encode_texts_with_embedding",
-    "_load_embedding_doc_cache",
-    "_save_embedding_doc_cache",
-    "_get_embedding_doc_matrix",
-    "_prewarm_embedding_catalog_sync",
-    "_router_method_to_embedding_methods",
     "ensure_router_embedding_prewarm",
     "precompute_router_embedding_cache",
     "select_embedding_top_skills",
@@ -85,3 +59,4 @@ __all__ = [
     "build_router_step_note",
     "derive_semantic_goal",
 ]
+

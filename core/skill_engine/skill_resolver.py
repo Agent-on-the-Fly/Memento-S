@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 import urllib.parse
 from pathlib import Path
@@ -26,6 +27,8 @@ from core.config import (
 from core.utils.logging_utils import log_event
 from core.utils.path_utils import _run_command_capture, _NO_GIT_PROMPT_ENV
 from core.skill_engine.skill_catalog import _load_router_catalog_from_jsonl, _choose_catalog_entry
+
+_SKILL_FETCH_LOCK = threading.Lock()
 
 
 def _iter_skill_roots() -> list[Path]:
@@ -172,6 +175,40 @@ def _pick_skill_dir_from_checkout(repo_root: Path, subpath: str, skill_name: str
     return candidates[0]
 
 
+def _parse_skill_repo_allowlist() -> set[str]:
+    raw = str(os.getenv("SKILL_DYNAMIC_FETCH_ALLOWED_REPOS") or "").strip()
+    if not raw:
+        return set()
+    out: set[str] = set()
+    for token in raw.replace(";", ",").split(","):
+        value = str(token or "").strip().lower().rstrip("/")
+        if value:
+            out.add(value)
+    return out
+
+
+def _is_allowed_repo(repo_url: str) -> tuple[bool, str]:
+    allow = _parse_skill_repo_allowlist()
+    if not allow:
+        return True, ""
+
+    raw = str(repo_url or "").strip().lower().rstrip("/")
+    parsed = urllib.parse.urlsplit(raw)
+    host = str(parsed.netloc or "").strip()
+    path = str(parsed.path or "").strip().strip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    owner_repo = "/".join(path.split("/")[:2]) if path else ""
+
+    candidates = {
+        raw,
+        f"{host}/{owner_repo}" if host and owner_repo else "",
+        owner_repo,
+    }
+    candidates = {c for c in candidates if c}
+    return any(c in allow for c in candidates), ",".join(sorted(candidates))
+
+
 def ensure_skill_available(skill_name: str) -> tuple[bool, str]:
     """Download a skill from GitHub if it is not available locally.
 
@@ -207,54 +244,65 @@ def ensure_skill_available(skill_name: str) -> tuple[bool, str]:
     if parsed is None:
         return False, f"unsupported githubUrl: {github_url!r}"
     repo_url, ref, subpath = parsed
-
-    root = SKILL_DYNAMIC_FETCH_ROOT
-    if not root.is_absolute():
-        root = (PROJECT_ROOT / root).resolve()
-    else:
-        root = root.resolve()
-    root.mkdir(parents=True, exist_ok=True)
-
-    dest = (root / name).resolve()
-    if dest.exists():
-        if (dest / "SKILL.md").exists():
-            return True, f"skill already exists: {dest}"
-        return False, f"target exists without SKILL.md: {dest}"
-
-    with tempfile.TemporaryDirectory(prefix="memento-skill-") as tmp:
-        repo_dir = Path(tmp) / "repo"
-        ok, msg = _run_command_capture(
-            ["git", "clone", "--filter=blob:none", "--no-checkout", repo_url, str(repo_dir)]
+    allowed, normalized_candidates = _is_allowed_repo(repo_url)
+    if not allowed:
+        return (
+            False,
+            "blocked by SKILL_DYNAMIC_FETCH_ALLOWED_REPOS; "
+            f"repo={repo_url} candidates={normalized_candidates}",
         )
-        if not ok:
-            return False, f"git clone failed: {msg}"
 
-        if subpath:
-            ok, msg = _run_command_capture(["git", "-C", str(repo_dir), "sparse-checkout", "init", "--cone"])
+    with _SKILL_FETCH_LOCK:
+        if has_local_skill_dir(name):
+            return True, f"skill already available: {name}"
+
+        root = SKILL_DYNAMIC_FETCH_ROOT
+        if not root.is_absolute():
+            root = (PROJECT_ROOT / root).resolve()
+        else:
+            root = root.resolve()
+        root.mkdir(parents=True, exist_ok=True)
+
+        dest = (root / name).resolve()
+        if dest.exists():
+            if (dest / "SKILL.md").exists():
+                return True, f"skill already exists: {dest}"
+            return False, f"target exists without SKILL.md: {dest}"
+
+        with tempfile.TemporaryDirectory(prefix="memento-skill-") as tmp:
+            repo_dir = Path(tmp) / "repo"
+            ok, msg = _run_command_capture(
+                ["git", "clone", "--filter=blob:none", "--no-checkout", repo_url, str(repo_dir)]
+            )
             if not ok:
-                return False, f"sparse-checkout init failed: {msg}"
-            ok, msg = _run_command_capture(["git", "-C", str(repo_dir), "sparse-checkout", "set", subpath])
+                return False, f"git clone failed: {msg}"
+
+            if subpath:
+                ok, msg = _run_command_capture(["git", "-C", str(repo_dir), "sparse-checkout", "init", "--cone"])
+                if not ok:
+                    return False, f"sparse-checkout init failed: {msg}"
+                ok, msg = _run_command_capture(["git", "-C", str(repo_dir), "sparse-checkout", "set", subpath])
+                if not ok:
+                    return False, f"sparse-checkout set failed: {msg}"
+
+            checkout_ref = ref if ref and ref != "HEAD" else "HEAD"
+            ok, msg = _run_command_capture(["git", "-C", str(repo_dir), "checkout", checkout_ref])
             if not ok:
-                return False, f"sparse-checkout set failed: {msg}"
+                return False, f"git checkout failed: {msg}"
 
-        checkout_ref = ref if ref and ref != "HEAD" else "HEAD"
-        ok, msg = _run_command_capture(["git", "-C", str(repo_dir), "checkout", checkout_ref])
-        if not ok:
-            return False, f"git checkout failed: {msg}"
+            source_dir = _pick_skill_dir_from_checkout(repo_dir, subpath, name)
+            if source_dir is None:
+                return False, f"SKILL.md not found after checkout: repo={repo_url} subpath={subpath!r}"
 
-        source_dir = _pick_skill_dir_from_checkout(repo_dir, subpath, name)
-        if source_dir is None:
-            return False, f"SKILL.md not found after checkout: repo={repo_url} subpath={subpath!r}"
-
-        staging = root / f".{name}.tmp-{os.getpid()}-{int(time.time() * 1000)}"
-        if staging.exists():
-            shutil.rmtree(staging, ignore_errors=True)
-        shutil.copytree(source_dir, staging)
-        skill_md = staging / "SKILL.md"
-        if not skill_md.exists():
-            shutil.rmtree(staging, ignore_errors=True)
-            return False, f"cloned folder missing SKILL.md: {source_dir}"
-        staging.rename(dest)
+            staging = root / f".{name}.tmp-{os.getpid()}-{int(time.time() * 1000)}"
+            if staging.exists():
+                shutil.rmtree(staging, ignore_errors=True)
+            shutil.copytree(source_dir, staging)
+            skill_md = staging / "SKILL.md"
+            if not skill_md.exists():
+                shutil.rmtree(staging, ignore_errors=True)
+                return False, f"cloned folder missing SKILL.md: {source_dir}"
+            staging.rename(dest)
 
     if has_local_skill_dir(name):
         log_event(
