@@ -1,0 +1,33 @@
+# Core CLI
+python-dotenv
+
+# LLM Providers
+anthropic
+openai
+litellm
+
+# MCP Client
+mcp
+
+# Web Search & Crawling
+google_search_results
+crawl4ai
+camel-ai
+
+# YAML parsing (for skill validation)
+pyyaml
+
+# HTTP clients (dependencies)
+httpx
+aiohttp
+requests
+
+# Async support
+aiofiles
+anyio
+
+# Dynamic CLI input/completion
+prompt_toolkit
+
+# Progress bar
+tqdm
