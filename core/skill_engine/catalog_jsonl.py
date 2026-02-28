@@ -79,7 +79,6 @@ def parse_catalog_jsonl_text(
                 "name": name,
                 "description": str(obj.get("description") or "").strip(),
                 "githubUrl": str(obj.get("githubUrl") or obj.get("github_url") or "").strip(),
-                "skillUrl": str(obj.get("skillUrl") or "").strip(),
                 "id": str(obj.get("id") or "").strip(),
                 "author": str(obj.get("author") or "").strip(),
                 "stars": _parse_int_or_zero(obj.get("stars")),

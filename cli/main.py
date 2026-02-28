@@ -1,4 +1,4 @@
-"""Memento-S CLI — multi-turn conversation powered by MCPAgent."""
+"""Memento-S CLI — multi-turn conversation powered by MementoAgent."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ import json
 import os
 import shlex
 import shutil
-import sys
 import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,20 +17,23 @@ from uuid import uuid4
 try:
     from prompt_toolkit import PromptSession
     from prompt_toolkit.completion import Completer, Completion
+    from prompt_toolkit.formatted_text import HTML
     from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.styles import Style as PTStyle
 
     PROMPT_TOOLKIT_AVAILABLE = True
 except Exception:
     PromptSession = None  # type: ignore[assignment]
     Completer = object  # type: ignore[assignment]
     Completion = None  # type: ignore[assignment]
+    HTML = None  # type: ignore[assignment]
     KeyBindings = None  # type: ignore[assignment]
+    PTStyle = None  # type: ignore[assignment]
     PROMPT_TOOLKIT_AVAILABLE = False
 
 from core.config import (
     DEBUG,
     PROJECT_ROOT,
-    SEMANTIC_ROUTER_DEBUG,
     SEMANTIC_ROUTER_ENABLED,
     WORKSPACE_DIR,
     refresh_runtime_config,
@@ -137,7 +139,7 @@ class TurnInterrupted(Exception):
 class SlashCommandCompleter(Completer):
     """Autocomplete slash commands while typing."""
 
-    def get_completions(self, document, complete_event):  # type: ignore[override]
+    def get_completions(self, document, _complete_event):  # type: ignore[override]
         text = str(document.text_before_cursor or "")
         stripped = text.lstrip()
         if not stripped.startswith("/"):
@@ -150,12 +152,26 @@ class SlashCommandCompleter(Completer):
                 continue
             if token == "/" or base.startswith(token):
                 seen.add(base)
+                display_html = HTML(f"<b>{base}</b>") if HTML else base
                 yield Completion(
                     base,
                     start_position=-len(token),
-                    display=base,
+                    display=display_html,
                     display_meta=desc,
                 )
+
+
+# Completion menu style: transparent background with visible border
+_COMPLETION_STYLE = None
+if PTStyle is not None:
+    _COMPLETION_STYLE = PTStyle.from_dict({
+        "completion-menu":                   "bg:default",
+        "completion-menu.completion":         "bg:default fg:ansiwhite",
+        "completion-menu.completion.current": "bg:ansibrightblack fg:ansiwhite bold",
+        "completion-menu.meta.completion":         "bg:default fg:ansibrightblack italic",
+        "completion-menu.meta.completion.current": "bg:ansibrightblack fg:ansiwhite italic",
+        "completion-menu.border":            "fg:ansibrightblack",
+    })
 
 
 def _build_prompt_session():
@@ -176,12 +192,15 @@ def _build_prompt_session():
             except Exception:
                 return
 
-        return PromptSession(
-            completer=SlashCommandCompleter(),
-            complete_while_typing=True,
-            reserve_space_for_menu=10,
-            key_bindings=kb,
-        )
+        session_kwargs: dict[str, Any] = {
+            "completer": SlashCommandCompleter(),
+            "complete_while_typing": True,
+            "reserve_space_for_menu": 10,
+            "key_bindings": kb,
+        }
+        if _COMPLETION_STYLE is not None:
+            session_kwargs["style"] = _COMPLETION_STYLE
+        return PromptSession(**session_kwargs)
     except Exception:
         return None
 
@@ -640,52 +659,26 @@ def _parse_skills_args(raw: str, *, default_limit: int = 5) -> tuple[str, int, s
 
 
 def _print_cloud_skills(query: str, *, top_k: int = 5) -> None:
-    from cli.skill_search import load_cloud_skill_catalog, search_cloud_skills
+    from core.skill_engine.skill_catalog import get_skill_catalog
 
     q = str(query or "").strip()
-    entries, meta = load_cloud_skill_catalog()
-    if not entries:
-        err = str(meta.get("error") or "cloud catalog unavailable").strip()
-        ref = str(meta.get("catalog_ref") or "").strip()
-        print(f"Cloud skills unavailable: {err}")
-        if ref:
-            print(f"catalog: {ref}")
-        print("Tip: set `SKILL_DYNAMIC_FETCH_CATALOG_JSONL` to a JSONL file path or https URL.")
-        print()
-        return
+    catalog = get_skill_catalog()
+    results = catalog.route(q, top_k=top_k)
 
-    results = search_cloud_skills(q, entries, top_k=top_k)
     if not results:
-        print(f"Cloud skills: no matches for query `{q}`.\n")
+        print(f"No skill matches for query `{q}`.\n")
         return
 
-    source = str(meta.get("source") or "unknown").strip()
-    cached = bool(meta.get("cached"))
-    stale = bool(meta.get("stale"))
-    flags = []
-    if cached:
-        flags.append("cached")
-    if stale:
-        flags.append("stale")
-    flag_text = f" ({', '.join(flags)})" if flags else ""
     title = q or "(top skills)"
-    print(f"Cloud Skills for `{title}`: {len(results)} result(s)  [source={source}{flag_text}, n={top_k}]")
+    print(f"Skills for `{title}`: {len(results)} result(s)  [n={top_k}]")
     for idx, item in enumerate(results, 1):
         name = str(item.get("name") or "").strip() or "(unknown)"
         desc = str(item.get("description") or "").strip()
-        stars = int(item.get("stars") or 0)
-        author = str(item.get("author") or "").strip()
-        github_url = str(item.get("githubUrl") or "").strip()
-
-        meta_bits = [f"stars={stars}"]
-        if author:
-            meta_bits.append(f"author: {author}")
-
-        print(f"{idx}. {name}  ({', '.join(meta_bits)})")
+        if desc and len(desc) > 200:
+            desc = desc[:197] + "..."
+        print(f"{idx}. {name}")
         if desc:
             print(f"   {desc}")
-        if github_url:
-            print(f"   github: {github_url}")
     print()
 
 
@@ -841,27 +834,27 @@ def _print_status(
 
 
 # ---------------------------------------------------------------------------
-# AgentSession — holds MCPAgent + multi-turn message history
+# AgentSession — holds MementoAgent + multi-turn message history
 # ---------------------------------------------------------------------------
 
 class AgentSession:
-    """Manages the MCPAgent lifecycle and accumulated conversation messages."""
+    """Manages the MementoAgent lifecycle and accumulated conversation messages."""
 
     def __init__(self, *, base_dir: Path | None = None, debug: bool = False) -> None:
         self.messages: list[dict[str, str]] = []
         self.debug = debug
         self._base_dir = base_dir
-        self.agent: Any = None  # MCPAgent instance
+        self.agent: Any = None  # MementoAgent instance
 
     async def start(self) -> None:
         from core.model_factory import build_chat_model
-        from core.mcp_agent import MCPAgent
+        from core.memento_agent import MementoAgent
 
         model = build_chat_model()
-        self.agent = MCPAgent(model=model, base_dir=self._base_dir)
+        self.agent = MementoAgent(model=model, base_dir=self._base_dir)
         await self.agent.start()
         if self.debug:
-            print(f"[debug] MCPAgent started, tools: {self.agent.tool_names}")
+            print(f"[debug] MementoAgent started, tools: {self.agent.tool_names}")
 
     async def rebuild(self) -> None:
         """Close and rebuild the agent after config changes."""
@@ -1033,7 +1026,7 @@ async def _execute_turn_streaming(
     *,
     debug: bool = False,
 ) -> str:
-    """Run one user turn through the MCPAgent, streaming output to stdout."""
+    """Run one user turn through the MementoAgent, streaming output to stdout."""
     augmented_text = user_text
     if SEMANTIC_ROUTER_ENABLED:
         try:
@@ -1061,7 +1054,7 @@ async def _execute_turn_streaming(
             # LangGraph stream_mode="updates" yields dicts keyed by node name.
             # The "agent" node contains LLM output messages.
             if isinstance(chunk, dict):
-                for node_name, update in chunk.items():
+                for _node_name, update in chunk.items():
                     if not isinstance(update, dict):
                         continue
                     msgs = update.get("messages", [])
@@ -1183,7 +1176,7 @@ async def _async_main(argv: list[str] | None = None) -> int:
     try:
         await session.start()
     except Exception as exc:
-        print(f"Error: failed to start MCPAgent: {exc}")
+        print(f"Error: failed to start MementoAgent: {exc}")
         return 1
 
     # ------------------------------------------------------------------
@@ -1320,26 +1313,14 @@ async def _async_main(argv: list[str] | None = None) -> int:
                         print()
                         continue
                     if not arg:
-                        # List local skills via MCP tool
-                        from core.mcp_server import _list_local_skills_text as list_local_skills
-                        result = list_local_skills()
-                        print(f"Local skills:\n{result}\n")
-                        print("Tip: use `/skills <query> -n 5` to search cloud skills.\n")
+                        from core.memento_server import _list_local_skills_text as list_local_skills
+                        print(f"Local skills:\n{list_local_skills()}\n")
+                        print("Tip: use `/skills <query>` to search skills.\n")
                         continue
 
-                arg_norm = arg
-                if arg_norm.lower().startswith("cloud "):
-                    arg_norm = arg_norm[6:].strip()
-
-                query_text, top_k, parse_err = _parse_skills_args(arg_norm, default_limit=5)
+                query_text, top_k, parse_err = _parse_skills_args(arg, default_limit=5)
                 if parse_err:
-                    print(f"Usage: /skills [query|local] [-n N] ({parse_err})\n")
-                    continue
-
-                if query_text.lower() == "local":
-                    from core.mcp_server import _list_local_skills_text as list_local_skills
-                    result = list_local_skills()
-                    print(f"Local skills:\n{result}\n")
+                    print(f"Usage: /skills [query] [-n N] ({parse_err})\n")
                     continue
                 _print_cloud_skills(query_text, top_k=top_k)
                 continue
@@ -1425,7 +1406,7 @@ async def _async_main(argv: list[str] | None = None) -> int:
                 continue
 
             # ----------------------------------------------------------
-            # Normal turn — run through MCPAgent
+            # Normal turn — run through MementoAgent
             # ----------------------------------------------------------
             _consecutive_ctrl_c = 0
             interrupted = False

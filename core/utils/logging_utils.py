@@ -79,12 +79,6 @@ def _ensure_exec_log_file() -> Path | None:
 # Public API
 # ---------------------------------------------------------------------------
 
-def get_exec_log_path() -> str | None:
-    """Return the path to the current session's execution log file, or None."""
-    path = _ensure_exec_log_file()
-    return str(path) if path else None
-
-
 def log_event(event: str, **fields: Any) -> None:
     """Append a structured JSON event to the execution log.
 

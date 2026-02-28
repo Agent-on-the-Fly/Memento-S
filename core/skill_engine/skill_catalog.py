@@ -1,15 +1,3 @@
-"""Semantic skill router (BM25 + Qwen embedding).
-
-Automatically matches user queries to relevant skills from both local
-and cloud catalogs, so matched skill names can be injected into the
-user message before the LLM sees it.
-
-Default method: BM25.  Set SEMANTIC_ROUTER_METHOD in .env to switch:
-  bm25  (default) — fast lexical matching via rank_bm25
-  qwen / qwen3    — Qwen embedding similarity (falls back to bm25)
-  memento_qwen    — fine-tuned Memento Qwen (falls back to bm25)
-"""
-
 from __future__ import annotations
 
 import os
@@ -837,17 +825,21 @@ class SkillCatalog:
 # ---------------------------------------------------------------------------
 
 def _extract_skill_description(skill_md: Path) -> str:
-    """Extract the first meaningful description line from SKILL.md."""
+    """Extract description from SKILL.md YAML frontmatter."""
     try:
-        for raw_line in skill_md.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or line.startswith("```") or line.startswith("---"):
-                continue
-            if line.startswith("-") or line.startswith("*") or line.startswith("<"):
-                continue
-            return line[:200]
+        text = skill_md.read_text(encoding="utf-8")
     except Exception:
-        pass
+        return ""
+    if not text.startswith("---"):
+        return ""
+    end = text.find("---", 3)
+    if end == -1:
+        return ""
+    for line in text[3:end].splitlines():
+        line = line.strip()
+        if line.lower().startswith("description:"):
+            desc = line[len("description:"):].strip().strip("\"'")
+            return desc[:200]
     return ""
 
 

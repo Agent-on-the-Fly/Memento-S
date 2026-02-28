@@ -1,9 +1,3 @@
-"""Build a LangChain ChatOpenAI model from OpenRouter environment variables.
-
-Reads env vars at call time (not import time) so that ``/config set``
-changes take effect without restarting the process.
-"""
-
 from __future__ import annotations
 
 import os
