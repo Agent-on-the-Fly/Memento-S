@@ -38,8 +38,9 @@ log_error()   { echo -e "${RED}[FAIL]${NC} $1"; }
 
 check_command() { command -v "$1" &>/dev/null; }
 
-# ── resolve project root (wherever this script lives) ────────────────
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ── resolve project root ─────────────────────────────────────────────
+REPO_URL="https://github.com/Agent-on-the-Fly/Memento-S.git"
+INSTALL_DIR="${MEMENTO_INSTALL_DIR:-$HOME/Memento-S}"
 ROUTER_DATASET_REPO="AgentFly/router-data"
 DEFAULT_OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 DEFAULT_OPENROUTER_MODEL="anthropic/claude-3.5-sonnet"
@@ -111,6 +112,26 @@ _prompt_required() {
 # ═════════════════════════════════════════════════════════════════════
 # Steps
 # ═════════════════════════════════════════════════════════════════════
+
+step_resolve_project() {
+    # If running via curl|bash, BASH_SOURCE[0] is empty — need to clone first
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-}")" 2>/dev/null && pwd 2>/dev/null || echo "")"
+    if [ -n "$script_dir" ] && [ -f "$script_dir/pyproject.toml" ]; then
+        PROJECT_DIR="$script_dir"
+        log_success "Project directory: $PROJECT_DIR"
+    else
+        if [ -d "$INSTALL_DIR/.git" ]; then
+            log_info "Updating existing installation at $INSTALL_DIR..."
+            git -C "$INSTALL_DIR" pull --ff-only 2>/dev/null || true
+        else
+            log_info "Cloning Memento-S to $INSTALL_DIR..."
+            git clone "$REPO_URL" "$INSTALL_DIR"
+        fi
+        PROJECT_DIR="$INSTALL_DIR"
+        log_success "Project cloned to: $PROJECT_DIR"
+    fi
+}
 
 step_check_prerequisites() {
     echo ""
@@ -392,6 +413,7 @@ print_success() {
 # ═════════════════════════════════════════════════════════════════════
 main() {
     print_banner
+    step_resolve_project
     step_check_prerequisites
     step_install_uv
     step_install_dependencies
