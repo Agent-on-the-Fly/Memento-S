@@ -243,6 +243,29 @@ def read_skill(
         return f"read_skill ERR: {exc}"
 
 
+# ===================================================================
+# 6. refresh_skills — notify catalog of newly created skills
+# ===================================================================
+
+@mcp.tool
+def refresh_skills() -> str:
+    """Refresh the skill catalog to pick up newly created or modified skills.
+
+    Call this after creating a new skill (e.g. via skill-creator) so it
+    becomes immediately available for routing and read_skill.
+    """
+    try:
+        from core.skill_engine.skill_catalog import get_skill_catalog
+        catalog = get_skill_catalog()
+        catalog.invalidate()
+        # Force rescan
+        skills = catalog.route("", top_k=1)
+        total = len(catalog._ensure_catalog())
+        return f"refresh_skills OK: catalog refreshed, {total} skills indexed"
+    except Exception as exc:
+        return f"refresh_skills ERR: {exc}"
+
+
 
 # ---------------------------------------------------------------------------
 # Non-tool helper for CLI /skills command

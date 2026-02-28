@@ -46,23 +46,37 @@ class MementoToolManager:
 # Internal helpers
 # ===================================================================
 
-def _coerce_tool_args(kwargs: dict[str, Any]) -> dict[str, Any]:
-    """Coerce stringified JSON values back to native types.
+def _coerce_tool_args(kwargs: dict[str, Any], schema: type[BaseModel] | None = None) -> dict[str, Any]:
+    """Coerce tool arguments to match expected types.
 
-    LLMs often serialize array/object parameters as JSON strings
-    (e.g. ``"[1, 50]"`` instead of ``[1, 50]``). FastMCP's pydantic
-    validation rejects these, so we parse them here.
+    Handles two directions:
+    - string → native: LLMs sometimes send ``"[1, 50]"`` instead of ``[1, 50]``
+    - native → string: LLMs sometimes send ``{"key": "val"}`` for a string param
     """
     out = dict(kwargs)
+
+    # Determine which fields expect a string type from the schema
+    str_fields: set[str] = set()
+    if schema is not None:
+        for fname, finfo in schema.model_fields.items():
+            ann = finfo.annotation
+            if ann is str or (hasattr(ann, "__origin__") and ann.__origin__ is str):
+                str_fields.add(fname)
+
     for key, value in out.items():
-        if not isinstance(value, str):
+        # dict/list → JSON string when the schema expects str
+        if isinstance(value, (dict, list)):
+            if not str_fields or key in str_fields:
+                out[key] = json.dumps(value, ensure_ascii=False, indent=2)
             continue
-        stripped = value.strip()
-        if stripped.startswith(("[", "{")):
-            try:
-                out[key] = json.loads(stripped)
-            except (json.JSONDecodeError, ValueError):
-                pass
+        # string → native (parse stringified JSON)
+        if isinstance(value, str):
+            stripped = value.strip()
+            if key not in str_fields and stripped.startswith(("[", "{")):
+                try:
+                    out[key] = json.loads(stripped)
+                except (json.JSONDecodeError, ValueError):
+                    pass
     return out
 
 
@@ -97,14 +111,19 @@ def _build_langchain_tools(
         )
 
         _tool_name = name  # capture in closure
+        args_model = _json_schema_to_pydantic(name, schema)
 
         async def _call(
             _client_ref: Client = client,
             _name: str = _tool_name,
+            _schema: type[BaseModel] = args_model,
             **kwargs: Any,
         ) -> str:
-            kwargs = _coerce_tool_args(kwargs)
-            result = await _client_ref.call_tool(_name, kwargs)
+            kwargs = _coerce_tool_args(kwargs, schema=_schema)
+            try:
+                result = await _client_ref.call_tool(_name, kwargs)
+            except Exception as exc:
+                return f"{_name} ERR: {exc}"
             return _extract_text(result)
 
         lc_tools.append(
@@ -113,7 +132,7 @@ def _build_langchain_tools(
                 description=description,
                 coroutine=_call,
                 func=None,  # async-only
-                args_schema=_json_schema_to_pydantic(name, schema),
+                args_schema=args_model,
             )
         )
     return lc_tools

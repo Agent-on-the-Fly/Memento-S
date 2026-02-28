@@ -6,7 +6,7 @@ from typing import Any, AsyncGenerator
 from langchain.agents import create_agent
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
-from core.config import AGENT_SYSTEM_PROMPT_TEMPLATE, WORKSPACE_DIR
+from core.config import AGENT_SYSTEM_PROMPT_TEMPLATE, PROJECT_ROOT, SKILLS_EXTRA_DIRS, WORKSPACE_DIR
 from core.memento_client import MementoToolManager
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,16 @@ class MementoAgent:
             self._system_prompt = system_prompt
         else:
             workspace = str(base_dir) if base_dir else str(WORKSPACE_DIR)
-            self._system_prompt = self._SYSTEM_PROMPT_TEMPLATE.format(workspace=workspace)
+            # Resolve skill_extra_dir for the prompt
+            if SKILLS_EXTRA_DIRS:
+                se = SKILLS_EXTRA_DIRS[0]
+            else:
+                se = PROJECT_ROOT / "skill_extra"
+            skill_extra_dir = str((PROJECT_ROOT / se).resolve() if not se.is_absolute() else se)
+            self._system_prompt = self._SYSTEM_PROMPT_TEMPLATE.format(
+                workspace=workspace,
+                skill_extra_dir=skill_extra_dir,
+            )
         self._base_dir = base_dir
         self._recursion_limit = recursion_limit
         self._tool_manager = MementoToolManager()

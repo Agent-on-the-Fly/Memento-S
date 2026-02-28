@@ -294,6 +294,10 @@ step_configure_env() {
     _upsert_env_value "$env_file" "SKILL_DYNAMIC_FETCH_CATALOG_JSONL" "router_data/skills_catalog.jsonl"
 
     chmod 600 "$env_file" 2>/dev/null || true
+
+    # Ensure skill_extra directory exists
+    mkdir -p "$PROJECT_DIR/skill_extra"
+
     log_success ".env configured"
 }
 

@@ -667,6 +667,22 @@ class SkillCatalog:
 
     # -- public API --
 
+    def invalidate(self) -> None:
+        """Clear cached catalog so next route() rescans local skills."""
+        with self._lock:
+            self._catalog = None
+            self._local_skills = None
+            self._cloud_skills = None
+
+    def notify_skill_created(self, skill_name: str) -> None:
+        """Call after a new skill is created locally to make it immediately available."""
+        self.invalidate()
+        # Also invalidate BM25 index so new skill is indexed
+        global _BM25_INDEX, _BM25_INDEX_SIG, _BM25_INDEX_SOURCE_ID
+        _BM25_INDEX = None
+        _BM25_INDEX_SIG = None
+        _BM25_INDEX_SOURCE_ID = None
+
     def route(self, query: str, top_k: int | None = None) -> list[dict]:
         """Route a user query to matching skills.
 
