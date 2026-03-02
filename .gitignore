@@ -11,4 +11,5 @@ evolve/
 gaia_data/
 hle_data/
 workspace/
-
+.agent/
+experiments/
