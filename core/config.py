@@ -192,6 +192,20 @@ SKILL_DYNAMIC_FETCH_ALLOWED_REPOS = tuple(
 # Execution logging
 # ===================================================================
 
+# ===================================================================
+# Evolve loop
+# ===================================================================
+
+HLE_JUDGE_MODEL = (os.getenv("HLE_JUDGE_MODEL") or "openai/o3-mini").strip()
+HLE_JUDGE_RETRIES = max(1, _env_int("HLE_JUDGE_RETRIES", 3))
+HLE_JUDGE_PASS_SCORE = _env_float("HLE_JUDGE_PASS_SCORE", 6.0)
+HLE_OPTIMIZER_MODEL = (os.getenv("HLE_OPTIMIZER_MODEL") or "").strip()  # empty = use default
+HLE_UTILITY_DISCOVER_THRESHOLD = _env_float("HLE_UTILITY_DISCOVER_THRESHOLD", 0.3)
+
+# ===================================================================
+# Execution logging
+# ===================================================================
+
 EXEC_LOG_ENABLED = _env_flag("EXEC_LOG_ENABLED", False)
 EXEC_LOG_DIR = Path(os.getenv("EXEC_LOG_DIR", "logs"))
 EXEC_LOG_MAX_CHARS = max(0, _env_int("EXEC_LOG_MAX_CHARS", 0))

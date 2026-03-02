@@ -7,3 +7,8 @@ router_data/embeddings/
 skills-extra/
 skill_extra/
 *.skill
+evolve/
+gaia_data/
+hle_data/
+workspace/
+

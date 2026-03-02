@@ -28,10 +28,8 @@ def _resolve_path(raw: str) -> Path:
     p = Path(raw)
     if not p.is_absolute():
         return _base_dir / p
-    
-    if p.exists() or p.parent.exists():
-        return p
-    return _base_dir / p.relative_to(p.anchor)
+    # Trust absolute paths as-is; create parent dirs if needed
+    return p
 
 
 # ===================================================================
@@ -236,7 +234,9 @@ def read_skill(
     skill_name: Annotated[str, "Name of the skill to read"],
 ) -> str:
     """Read a skill's SKILL.md content."""
-    from core.skill_engine.skill_resolver import openskills_read
+    from core.skill_engine.skill_resolver import ensure_skill_available, openskills_read
+    # Auto-fetch from catalog if not locally available
+    ensure_skill_available(skill_name)
     try:
         return openskills_read(skill_name)
     except Exception as exc:
