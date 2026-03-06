@@ -1,0 +1,35 @@
+:<<"::CMDLITERAL"
+@ECHO OFF
+GOTO :WINDOWS
+::CMDLITERAL
+
+[ -z "$BASH_VERSION" ] && exec bash "$0" "$@"
+
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+cd "$SCRIPT_DIR"
+
+if [ $# -eq 0 ]; then
+    uv run python tui.py run
+else
+    uv run python tui.py "$@"
+fi
+exit $?
+
+:WINDOWS
+REM Windows (CMD) implementation
+REM This part runs when executed in CMD (e.g. on Windows)
+pushd "%~dp0"
+if "%~1"=="" (
+    uv run python tui.py run
+) else (
+    uv run python tui.py %*
+)
+popd
+exit /b %ERRORLEVEL%

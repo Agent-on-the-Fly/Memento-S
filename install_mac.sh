@@ -1,0 +1,479 @@
+#!/usr/bin/env bash
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+PYTHON_VERSION="3.12"
+EMBEDDING_DOWNLOAD_REQUIRED=false
+RERANK_DOWNLOAD_REQUIRED=false
+
+print_banner() {
+    echo -e "${CYAN}"
+    echo "╔═══════════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                       ║"
+    echo "║   ███╗   ███╗███████╗███╗   ███╗███████╗███╗   ██╗████████╗ ██████╗    ║"
+    echo "║   ████╗ ████║██╔════╝████╗ ████║██╔════╝████╗  ██║╚══██╔══╝██╔═══██╗   ║"
+    echo "║   ██╔████╔██║█████╗  ██╔████╔██║█████╗  ██╔██╗ ██║   ██║   ██║   ██║   ║"
+    echo "║   ██║╚██╔╝██║██╔══╝  ██║╚██╔╝██║██╔══╝  ██║╚██╗██║   ██║   ██║   ██║   ║"
+    echo "║   ██║ ╚═╝ ██║███████╗██║ ╚═╝ ██║███████╗██║ ╚████║   ██║   ╚██████╔╝   ║"
+    echo "║   ╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝   ╚═╝    ╚═════╝    ║"
+    echo "║                           Memento-S                                   ║"
+    echo "║                   Install (macOS, Local Source)                      ║"
+    echo "║                                                                       ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+check_command() { command -v "$1" &> /dev/null; }
+
+ask_yes_no() {
+    local prompt="$1"
+    local default_answer="${2:-N}"
+    local reply
+
+    while true; do
+        if [[ "$default_answer" == "Y" ]]; then
+            read -r -p "$prompt [Y/n]: " reply
+            reply="${reply:-Y}"
+        else
+            read -r -p "$prompt [y/N]: " reply
+            reply="${reply:-N}"
+        fi
+
+        case "$reply" in
+            [Yy]|[Yy][Ee][Ss]) return 0 ;;
+            [Nn]|[Nn][Oo]) return 1 ;;
+            *) echo "Please answer yes or no." ;;
+        esac
+    done
+}
+
+ask_non_empty() {
+    local prompt="$1"
+    local value
+    while true; do
+        read -r -p "$prompt: " value
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return 0
+        fi
+        echo "Value cannot be empty."
+    done
+}
+
+check_or_install_tmux() {
+    if check_command tmux; then
+        log_success "tmux: $(tmux -V 2>&1)"
+        return 0
+    fi
+
+    log_info "tmux not found, attempting to install..."
+    if [[ "$(uname -s)" == "Darwin" ]] && check_command brew; then
+        if brew install tmux 2>/dev/null; then
+            if check_command tmux; then
+                log_success "tmux installed: $(tmux -V 2>&1)"
+                return 0
+            fi
+        fi
+    fi
+
+    log_warn "tmux is not installed. Install manually: macOS: brew install tmux"
+    return 1
+}
+
+install_uv() {
+    if check_command uv; then
+        log_success "uv: $(uv --version 2>&1)"
+        return 0
+    fi
+
+    log_info "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
+    if check_command uv; then
+        log_success "uv installed: $(uv --version 2>&1)"
+    else
+        log_error "Failed to install uv. Please install manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        exit 1
+    fi
+}
+
+ensure_python312() {
+    if uv python find 3.12 &>/dev/null; then
+        log_success "Python 3.12 available via uv"
+        return 0
+    fi
+    log_info "Installing Python 3.12 via uv..."
+    if ! uv python install 3.12; then
+        log_error "Failed to install Python 3.12."
+        exit 1
+    fi
+    log_success "Python 3.12 installed."
+}
+
+create_venv_and_install_deps() {
+    cd "$PROJECT_ROOT" || { log_error "Project root not found: $PROJECT_ROOT"; exit 1; }
+
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}            Creating .venv and Installing Dependencies          ${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    log_info "Creating .venv with Python $PYTHON_VERSION..."
+    if ! uv venv .venv --python "$PYTHON_VERSION"; then
+        log_error "Failed to create .venv."
+        exit 1
+    fi
+    log_success ".venv created."
+
+    log_info "Installing dependencies from requirements.txt..."
+    if ! uv pip install --python .venv/bin/python -r requirements.txt; then
+        log_error "Failed to install Python dependencies."
+        exit 1
+    fi
+
+    log_info "Installing local CLI entry (memento)..."
+    if ! uv pip install --python .venv/bin/python -e .; then
+        log_error "Failed to install local project package for memento command."
+        exit 1
+    fi
+    log_success "Dependencies and local CLI installed."
+}
+
+install_nvm_and_nodejs() {
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+    if check_command npm; then
+        log_success "npm: $(npm --version 2>&1)"
+        return 0
+    fi
+
+    log_info "npm not found, installing Node.js via nvm..."
+
+    if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+        log_info "Installing nvm..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    fi
+
+    if ! command -v nvm &>/dev/null; then
+        log_error "Failed to install nvm. Please install Node.js manually."
+        return 1
+    fi
+
+    log_info "Installing Node.js LTS..."
+    nvm install --lts
+    nvm use --lts
+
+    if check_command npm; then
+        log_success "Node.js installed: $(node --version 2>&1), npm: $(npm --version 2>&1)"
+    else
+        log_warn "Failed to install Node.js. Skills installation will be skipped."
+        return 1
+    fi
+}
+
+install_openskills() {
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+    if ! check_command npm; then
+        log_warn "npm not available. Skipping openskills installation."
+        log_warn "To install later: npm install -g openskills && openskills sync -y"
+        return
+    fi
+
+    if ! check_command openskills; then
+        log_info "Installing openskills..."
+        if ! npm install -g openskills 2>/dev/null; then
+            sudo npm install -g openskills 2>/dev/null || {
+                log_warn "Failed to install openskills. Skipping skills."
+                return
+            }
+        fi
+    fi
+
+    log_info "Installing skills..."
+    cd "$PROJECT_ROOT" || return
+    for d in skills/*; do
+        [ -d "$d" ] || continue
+        name="$(basename "$d")"
+        if [ -d ".agent/skills/$name" ]; then
+            openskills update "$name" 2>/dev/null || true
+        else
+            openskills install "./skills/$name" --universal --yes 2>/dev/null || true
+        fi
+    done
+    openskills sync -y 2>/dev/null || true
+    log_success "Skills installed."
+}
+
+ensure_env_file() {
+    local env_file="$PROJECT_ROOT/.env"
+    if [ ! -f "$env_file" ]; then
+        if [ -f "$PROJECT_ROOT/.env.example" ]; then
+            cp "$PROJECT_ROOT/.env.example" "$env_file"
+            log_info "Created .env from .env.example"
+        else
+            touch "$env_file"
+            log_info "Created empty .env"
+        fi
+    fi
+}
+
+set_env_var() {
+    local key="$1"
+    local value="$2"
+    local env_file="$PROJECT_ROOT/.env"
+
+    python3 - "$env_file" "$key" "$value" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+key = sys.argv[2]
+value = sys.argv[3]
+line = f"{key}={value}"
+
+if path.exists():
+    text = path.read_text(encoding="utf-8")
+else:
+    text = ""
+
+pattern = re.compile(rf"^\s*#?\s*{re.escape(key)}\s*=.*$", re.MULTILINE)
+if pattern.search(text):
+    text = pattern.sub(line, text, count=1)
+else:
+    if text and not text.endswith("\n"):
+        text += "\n"
+    text += line + "\n"
+
+path.write_text(text, encoding="utf-8")
+PY
+}
+
+configure_retrieval_models() {
+    ensure_env_file
+
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}                Embedding / Rerank Configuration               ${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    if ask_yes_no "Do you want to use Embedding API?" "N"; then
+        local emb_model emb_base emb_key
+        emb_model="$(ask_non_empty "Embedding model (e.g. BAAI/bge-m3)")"
+        emb_base="$(ask_non_empty "Embedding API base URL")"
+        emb_key="$(ask_non_empty "Embedding API key")"
+
+        set_env_var "EMBEDDING_MODEL" "$emb_model"
+        set_env_var "EMBEDDING_BASE_URL" "$emb_base"
+        set_env_var "EMBEDDING_API_KEY" "$emb_key"
+        EMBEDDING_DOWNLOAD_REQUIRED=false
+        log_success "Embedding configured with API."
+    else
+        if ask_yes_no "No Embedding API. Download local embedding model (BAAI/bge-m3)?" "Y"; then
+            set_env_var "EMBEDDING_MODEL" "BAAI/bge-m3"
+            set_env_var "EMBEDDING_BASE_URL" ""
+            set_env_var "EMBEDDING_API_KEY" ""
+            EMBEDDING_DOWNLOAD_REQUIRED=true
+            log_info "Will download local embedding model."
+        else
+            set_env_var "EMBEDDING_MODEL" ""
+            set_env_var "EMBEDDING_BASE_URL" ""
+            set_env_var "EMBEDDING_API_KEY" ""
+            set_env_var "EMBEDDING_WEIGHT" "0"
+            set_env_var "BM25_WEIGHT" "1"
+            EMBEDDING_DOWNLOAD_REQUIRED=false
+            log_info "Embedding disabled. BM25-only retrieval enabled (BM25_WEIGHT=1, EMBEDDING_WEIGHT=0)."
+        fi
+    fi
+
+    if ask_yes_no "Do you want to use Rerank API?" "N"; then
+        local rerank_model rerank_base rerank_key
+        rerank_model="$(ask_non_empty "Rerank model (e.g. BAAI/bge-reranker-v2-m3)")"
+        rerank_base="$(ask_non_empty "Rerank API base URL")"
+        rerank_key="$(ask_non_empty "Rerank API key")"
+
+        set_env_var "RERANKER_ENABLED" "true"
+        set_env_var "RERANKER_MODEL" "$rerank_model"
+        set_env_var "RERANKER_BASE_URL" "$rerank_base"
+        set_env_var "RERANKER_API_KEY" "$rerank_key"
+        RERANK_DOWNLOAD_REQUIRED=false
+        log_success "Reranker configured with API."
+    else
+        if ask_yes_no "No Rerank API. Download local rerank model (BAAI/bge-reranker-v2-m3)?" "N"; then
+            set_env_var "RERANKER_ENABLED" "true"
+            set_env_var "RERANKER_MODEL" "BAAI/bge-reranker-v2-m3"
+            set_env_var "RERANKER_BASE_URL" ""
+            set_env_var "RERANKER_API_KEY" ""
+            RERANK_DOWNLOAD_REQUIRED=true
+            log_info "Will download local rerank model."
+        else
+            set_env_var "RERANKER_ENABLED" "false"
+            set_env_var "RERANKER_MODEL" ""
+            set_env_var "RERANKER_BASE_URL" ""
+            set_env_var "RERANKER_API_KEY" ""
+            RERANK_DOWNLOAD_REQUIRED=false
+            log_info "Rerank disabled."
+        fi
+    fi
+
+    log_success "Retrieval model configuration written to .env"
+}
+
+download_optional_models() {
+    local py="$PROJECT_ROOT/.venv/bin/python"
+    if [ ! -x "$py" ]; then
+        log_warn ".venv not found, skipping model downloads."
+        return
+    fi
+
+    if [[ "$EMBEDDING_DOWNLOAD_REQUIRED" == "true" ]]; then
+        log_info "Downloading BAAI/bge-m3 embedding model (may take a while)..."
+        if HF_HUB_DISABLE_PROGRESS_BARS=1 "$py" -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"; then
+            log_success "BAAI/bge-m3 downloaded."
+        else
+            log_warn "Embedding model download failed (network or disk). You can retry later."
+        fi
+    else
+        log_info "Skipping embedding model download."
+    fi
+
+    if [[ "$RERANK_DOWNLOAD_REQUIRED" == "true" ]]; then
+        log_info "Downloading BAAI/bge-reranker-v2-m3 model (may take a while)..."
+        if HF_HUB_DISABLE_PROGRESS_BARS=1 "$py" -c "from sentence_transformers import CrossEncoder; CrossEncoder('BAAI/bge-reranker-v2-m3')"; then
+            log_success "BAAI/bge-reranker-v2-m3 downloaded."
+        else
+            log_warn "Rerank model download failed (network or disk). You can retry later."
+        fi
+    else
+        log_info "Skipping rerank model download."
+    fi
+}
+
+run_post_install_config() {
+    local py="$PROJECT_ROOT/.venv/bin/python"
+    if [ ! -x "$py" ]; then
+        log_warn ".venv not found, skipping post-install config commands."
+        return
+    fi
+
+    if [ ! -f "$PROJECT_ROOT/cli/main.py" ]; then
+        log_warn "cli/main.py not found in $PROJECT_ROOT, skipping config commands."
+        return
+    fi
+
+    log_info "Running post-install config commands..."
+    cd "$PROJECT_ROOT" || {
+        log_warn "Failed to cd into $PROJECT_ROOT for config commands."
+        return
+    }
+
+    if ! "$py" cli/main.py config list; then
+        log_warn "Failed to run 'python cli/main.py config list'. You can run it manually later."
+    fi
+
+    if ! "$py" cli/main.py config; then
+        log_warn "Failed to run 'python cli/main.py config'. You can run it manually later."
+    fi
+}
+
+init_vector_db() {
+    local py="$PROJECT_ROOT/.venv/bin/python"
+    if [ ! -x "$py" ]; then
+        log_warn ".venv not found, skipping vector DB init."
+        return
+    fi
+
+    if [ ! -f "$PROJECT_ROOT/cli/main.py" ]; then
+        log_warn "cli/main.py not found in $PROJECT_ROOT, skipping vector DB init."
+        return
+    fi
+
+    log_info "Initializing vector database (running agent until ready)..."
+    (
+        cd "$PROJECT_ROOT" || exit 1
+        "$py" cli/main.py agent 2>&1 | while IFS= read -r line; do
+            echo "$line"
+            if echo "$line" | grep -q "You"; then
+                break
+            fi
+        done
+    ) || true
+    log_success "Vector database initialized."
+}
+
+print_success() {
+    echo ""
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}                 Installation Complete!                        ${NC}"
+    echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${CYAN}Install directory:${NC} $PROJECT_ROOT"
+    echo ""
+    echo -e "  ${YELLOW}To start Memento-S:${NC}"
+    echo ""
+    echo -e "    ${GREEN}cd $PROJECT_ROOT && .venv/bin/memento${NC}"
+    echo ""
+    echo -e "  ${CYAN}Other commands:${NC}"
+    echo -e "    .venv/bin/python tui.py doctor   - Check configuration"
+    echo -e "    .venv/bin/python tui.py config  - Show current config"
+    echo -e "    .venv/bin/python tui.py --help  - Show all commands"
+    echo ""
+}
+
+main() {
+    print_banner
+
+    if ! check_command curl; then
+        log_error "curl is required (for uv/nvm). Please install curl first."
+        exit 1
+    fi
+
+    if [ ! -d "$PROJECT_ROOT" ] || [ ! -f "$PROJECT_ROOT/requirements.txt" ]; then
+        log_error "Project root not found or invalid (no requirements.txt): $PROJECT_ROOT"
+        exit 1
+    fi
+
+    check_or_install_tmux || true
+
+    install_uv
+    ensure_python312
+
+    create_venv_and_install_deps
+
+    install_nvm_and_nodejs
+    install_openskills
+
+    configure_retrieval_models
+    download_optional_models
+
+    run_post_install_config
+
+    init_vector_db
+
+    print_success
+}
+
+main "$@"

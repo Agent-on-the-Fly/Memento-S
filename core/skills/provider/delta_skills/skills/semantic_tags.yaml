@@ -1,0 +1,236 @@
+
+communication:
+  - feishu
+  - lark
+  - slack
+  - discord
+  - telegram
+  - wechat
+  - dingtalk
+  - email
+  - mail
+  - chat
+  - sms
+  - notify
+  - notification
+  - inbox
+  - smtp
+  - imap
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+
+api-integration:
+  - api
+  - http
+  - rest
+  - webhook
+  - graphql
+  - endpoint
+  - oauth
+  - 
+  - 
+
+web:
+  - url
+  - web
+  - scrape
+  - crawl
+  - browser
+  - html
+  - selenium
+  - playwright
+  - 
+  - 
+
+office-document:
+  - pdf
+  - docx
+  - pptx
+  - xlsx
+  - excel
+  - word
+  - powerpoint
+  - spreadsheet
+  - document
+  - slide
+  - 
+  - 
+  - 
+
+data-processing:
+  - data
+  - csv
+  - json
+  - xml
+  - parse
+  - transform
+  - etl
+  - pandas
+  - dataframe
+  - 
+  - 
+  - 
+
+file-io:
+  - file
+  - read
+  - write
+  - save
+  - upload
+  - download
+  - zip
+  - compress
+  - 
+  - 
+  - 
+
+automation:
+  - automate
+  - schedule
+  - cron
+  - batch
+  - pipeline
+  - workflow
+  - monitor
+  - deploy
+  - 
+  - 
+  - 
+
+devops:
+  - git
+  - github
+  - gitlab
+  - docker
+  - kubernetes
+  - k8s
+  - ci
+  - cd
+  - terraform
+  - 
+  - 
+
+ai-ml:
+  - llm
+  - gpt
+  - model
+  - embedding
+  - machine learning
+  - ai
+  - neural
+  - train
+  - inference
+  - 
+  - 
+
+text-processing:
+  - text
+  - string
+  - regex
+  - nlp
+  - summarize
+  - translate
+  - transcri
+  - markdown
+  - 
+  - 
+  - 
+  - 
+
+math:
+  - math
+  - calculate
+  - compute
+  - statistics
+  - formula
+  - 
+  - 
+  - 
+
+media:
+  - image
+  - video
+  - audio
+  - photo
+  - resize
+  - crop
+  - chart
+  - plot
+  - graph
+  - visualiz
+  - gif
+  - canvas
+  - 
+  - 
+  - 
+  - 
+  - 
+
+terminal:
+  - terminal
+  - tmux
+  - command
+  - shell
+  - cli
+  - bash
+  - 
+  - 
+  - 
+
+code-tools:
+  - generate
+  - create
+  - scaffold
+  - template
+  - boilerplate
+  - code
+  - develop
+  - build
+  - mcp
+  - skill
+  - 
+  - 
+  - 
+  - 
+
+search:
+  - search
+  - find
+  - query
+  - lookup
+  - retrieve
+  - index
+  - 
+  - 
+  - 
+
+finance:
+  - finance
+  - stock
+  - market
+  - trading
+  - payment
+  - invoice
+  - 
+  - 
+  - 
+  - 
+
+design:
+  - design
+  - brand
+  - style
+  - theme
+  - color
+  - font
+  - logo
+  - ui
+  - ux
+  - figma
+  - 
+  - 
+  - 

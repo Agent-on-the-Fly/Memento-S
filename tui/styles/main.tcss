@@ -1,0 +1,372 @@
+/* Memento-S TUI Theme — Clean Modern Dark
+ *
+ * Colour palette (GitHub-dark inspired):
+ *   bg-canvas:   #0d1117    bg-surface:  #161b22    bg-raised: #21262d
+ *   border:      #30363d    text-primary:#c9d1d9    text-muted:#8b949e
+ *   accent-blue: #58a6ff    accent-green:#238636    accent-red:#f85149
+ */
+
+Screen {
+    background: #0d1117;
+    layers: base overlay;
+}
+
+/* ========== Top Header Bar ========== */
+
+#app-header {
+    dock: top;
+    width: 100%;
+    height: 1;
+    background: #21262d;
+    color: #c9d1d9;
+    layer: overlay;
+}
+
+#header-title {
+    width: 1fr;
+    height: 1;
+    text-style: bold;
+}
+
+#header-clock {
+    width: auto;
+    height: 1;
+    text-align: right;
+}
+
+Footer {
+    background: #161b22;
+    color: #8b949e;
+}
+
+/* ========== History Sidebar ========== */
+
+#history-sidebar {
+    width: 34;
+    dock: left;
+    background: #161b22;
+    border-right: solid #30363d;
+    display: block;
+    padding: 0;
+}
+
+#history-sidebar ConversationList {
+    width: 100%;
+    height: 1fr;
+}
+
+/* ── + New Chat button (ghost / outlined style) ──
+ * Deliberately low-contrast so it feels like a natural part of the sidebar
+ * rather than a dominating call-to-action.
+ */
+#new-chat-btn {
+    width: 100%;
+    height: 3;
+    margin: 1 1 0 1;
+    background: #161b22;
+    color: #8b949e;
+    text-style: bold;
+    border: dashed #30363d;
+    outline: none;
+}
+
+#new-chat-btn:hover {
+    background: #1c2129;
+    color: #c9d1d9;
+    border: dashed #58a6ff;
+    outline: none;
+}
+
+#new-chat-btn:focus {
+    background: #1c2129;
+    color: #c9d1d9;
+    border: dashed #58a6ff;
+    outline: none;
+}
+
+#new-chat-btn.-active {
+    background: #21262d;
+    color: #c9d1d9;
+    border: dashed #58a6ff;
+    outline: none;
+}
+
+/* ── Conversation scroll area ── */
+
+#conv-scroll-area {
+    width: 100%;
+    height: 1fr;
+    background: #161b22;
+    padding: 1 1 0 1;
+    scrollbar-size: 1 1;
+}
+
+/* Time-period group header in conversation list */
+.conv-group-header {
+    width: 100%;
+    height: 1;
+    color: #8b949e;
+    text-style: bold;
+    padding: 0 1;
+    background: #161b22;
+}
+
+/* Individual conversation entry (TextArea-based, selectable) */
+.conv-entry {
+    background: #161b22;
+    border-left: wide #30363d;
+    color: #c9d1d9;
+    height: auto;
+    min-height: 3;
+    margin: 0 0 1 0;
+    padding: 0 1;
+    overflow-y: hidden;
+}
+
+.conv-entry:focus {
+    border-left: wide #58a6ff;
+    background: #1c2129;
+}
+
+/* Currently active conversation entry */
+.conv-entry-active {
+    border-left: wide #238636;
+    background: #1a2332;
+}
+
+.conv-entry-active:focus {
+    border-left: wide #3fb950;
+}
+
+#conv-hint-bar {
+    width: 100%;
+    height: 1;
+    background: #0d1117;
+    color: #8b949e;
+    text-align: center;
+    dock: bottom;
+}
+
+/* Empty placeholder */
+.conv-empty {
+    color: #8b949e;
+    text-style: italic;
+    border: none;
+    background: transparent;
+    min-height: 3;
+}
+
+/* ========== Welcome Banner ========== */
+
+#welcome-title {
+    width: 100%;
+    text-align: center;
+    color: #58a6ff;
+    text-style: bold;
+    padding: 1 0 0 0;
+}
+
+#welcome-info {
+    padding: 1 2;
+    color: #c9d1d9;
+}
+
+/* ========== Main Layout ========== */
+
+#main-layout {
+    width: 1fr;
+    height: 1fr;
+}
+
+#chat-area {
+    height: 1fr;
+    border: round #30363d;
+    background: #0d1117;
+    overflow-y: scroll;
+    padding: 1 2;
+    scrollbar-size: 1 1;
+}
+
+#log-area {
+    height: 8;
+    background: #161b22;
+    border-top: solid #30363d;
+    color: #7ee787;
+    display: none;
+    padding: 0 1;
+}
+
+#status-row {
+    height: 1;
+    background: #161b22;
+}
+
+#status-bar {
+    width: 1fr;
+    height: 1;
+    background: #161b22;
+    color: #8b949e;
+    padding: 0 2;
+}
+
+#loading-indicator {
+    width: auto;
+    height: 1;
+    background: #161b22;
+    color: #f85149;
+    padding: 0 1;
+    display: none;
+}
+
+#user-input {
+    background: #161b22;
+    border: tall #30363d;
+    color: #c9d1d9;
+    padding: 0 1;
+    height: 8;
+    overflow-y: auto;
+    width: 1fr;
+}
+
+#user-input:focus {
+    border: tall #58a6ff;
+}
+
+/* ========== Chat Message Styles ========== */
+
+.selectable-msg {
+    background: transparent;
+    border: none;
+    padding: 0;
+    height: auto;
+    overflow-y: hidden;
+}
+
+/* User message */
+.user-msg {
+    margin-top: 1;
+    margin-bottom: 1;
+    color: #58a6ff;
+}
+
+/* AI response label */
+.ai-label {
+    margin-top: 1;
+    margin-bottom: 0;
+    color: #a5d6ff;
+}
+
+/* AI response content */
+.ai-msg {
+    margin-top: 0;
+    margin-bottom: 1;
+    border-left: wide #238636;
+    padding-left: 2;
+    background: #161b22;
+}
+
+/* System messages */
+.system-msg {
+    margin: 1 0;
+    color: #8b949e;
+    text-style: italic;
+}
+
+/* Command hints dropdown */
+#command-hints {
+    display: none;
+    background: #161b22;
+    border: tall #30363d;
+    height: 7;
+    margin-bottom: 1;
+}
+
+/* ========== Modal Screens ========== */
+
+ModalScreen {
+    align: center middle;
+}
+
+#confirm-container, #dialog-container {
+    padding: 2 3;
+    width: 50;
+    height: 15;
+    background: #161b22;
+    border: thick #30363d;
+}
+
+.button-row {
+    margin-top: 1;
+    height: 3;
+    align: center middle;
+}
+
+/* ========== Step Workflow Styles ========== */
+
+/* Step header - shows step number and skill name */
+.step-header {
+    margin-top: 1;
+    margin-bottom: 0;
+    color: #d29922;
+    text-style: bold;
+    padding: 0 1;
+}
+
+/* Step output content */
+.step-output {
+    margin-top: 0;
+    margin-bottom: 1;
+    margin-left: 2;
+    border-left: wide #d29922;
+    padding-left: 2;
+    background: #161b22;
+    color: #c9d1d9;
+}
+
+/* Workflow complete indicator */
+.step-complete {
+    margin-top: 1;
+    margin-bottom: 0;
+    color: #238636;
+    text-style: bold;
+    padding: 0 1;
+}
+
+/* Completion reason text */
+.step-reason {
+    margin-bottom: 1;
+    margin-left: 2;
+    color: #8b949e;
+    text-style: italic;
+}
+
+/* Error header */
+.step-error {
+    margin-top: 1;
+    color: #f85149;
+    text-style: bold;
+    padding: 0 1;
+}
+
+/* Error message content */
+.error-msg {
+    margin: 0 0 1 2;
+    color: #f85149;
+    border-left: wide #f85149;
+    padding-left: 2;
+    background: #21262d;
+}
+
+/* ========== Markdown ========== */
+
+Markdown {
+    margin: 0;
+    padding: 0;
+}
+
+MarkdownFence {
+    background: #161b22;
+    border: solid #30363d;
+    margin: 1 0;
+    padding: 1;
+}
