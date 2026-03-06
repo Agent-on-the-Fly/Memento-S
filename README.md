@@ -10,16 +10,26 @@
 
 ## Quick Install
 
+### macOS / Linux
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/Agent-on-the-Fly/Memento-S/main/install.sh | bash
 ```
 
-The installer sets up uv, Python 3.12, .venv, Node.js, openskills, and optionally downloads embedding/rerank models. A Windows installer (`install_windows.ps1` / `install_windows.bat`) is also available.
+### Windows
+
+```powershell
+git clone https://github.com/Agent-on-the-Fly/Memento-S.git
+cd Memento-S
+.\install_windows.ps1
+```
+
+The installer sets up uv, Python 3.12, .venv, Node.js, openskills, and optionally downloads embedding/rerank models.
 
 **After installation, configure your LLM provider in `.env` and run:**
 
 ```bash
-.venv/bin/memento run
+cd Memento-S && .venv/bin/memento run
 ```
 
 ---
