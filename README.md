@@ -13,7 +13,7 @@
 ### macOS / Linux
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Agent-on-the-Fly/Memento-S/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Agent-on-the-Fly/Memento-S/main/install_mac.sh | bash
 ```
 
 ### Windows

@@ -9,8 +9,27 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-./}")" && pwd)"
+REPO_URL="https://github.com/Agent-on-the-Fly/Memento-S.git"
+DEFAULT_INSTALL_DIR="$HOME/Memento-S"
+
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    PROJECT_ROOT="$SCRIPT_DIR"
+else
+    echo ""
+    echo -e "${CYAN}Detected curl | bash mode. Need to clone the repository first.${NC}"
+    read -r -p "Install directory [$DEFAULT_INSTALL_DIR]: " INSTALL_DIR
+    INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+
+    if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/requirements.txt" ]; then
+        echo -e "${BLUE}[INFO]${NC} Directory exists, pulling latest changes..."
+        git -C "$INSTALL_DIR" pull || true
+    else
+        echo -e "${BLUE}[INFO]${NC} Cloning Memento-S into $INSTALL_DIR..."
+        git clone "$REPO_URL" "$INSTALL_DIR"
+    fi
+    PROJECT_ROOT="$INSTALL_DIR"
+fi
 PYTHON_VERSION="3.12"
 EMBEDDING_DOWNLOAD_REQUIRED=false
 RERANK_DOWNLOAD_REQUIRED=false
