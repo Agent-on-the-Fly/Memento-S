@@ -549,7 +549,7 @@ def auto_generate_tags(
     text = f"{name} {description}".lower()
 
     for tag, keywords in _SEMANTIC_TAGS.items():
-        if any(kw in text for kw in keywords):
+        if keywords and any(kw in text for kw in keywords if kw):
             tags.add(tag)
 
     name_parts = name.lower().replace("-", "_").replace(" ", "_").split("_")

@@ -16,12 +16,6 @@ communication:
   - inbox
   - smtp
   - imap
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
 
 api-integration:
   - api
@@ -31,8 +25,6 @@ api-integration:
   - graphql
   - endpoint
   - oauth
-  - 
-  - 
 
 web:
   - url
@@ -43,8 +35,6 @@ web:
   - html
   - selenium
   - playwright
-  - 
-  - 
 
 office-document:
   - pdf
@@ -57,9 +47,6 @@ office-document:
   - spreadsheet
   - document
   - slide
-  - 
-  - 
-  - 
 
 data-processing:
   - data
@@ -71,9 +58,6 @@ data-processing:
   - etl
   - pandas
   - dataframe
-  - 
-  - 
-  - 
 
 file-io:
   - file
@@ -84,9 +68,6 @@ file-io:
   - download
   - zip
   - compress
-  - 
-  - 
-  - 
 
 automation:
   - automate
@@ -97,9 +78,6 @@ automation:
   - workflow
   - monitor
   - deploy
-  - 
-  - 
-  - 
 
 devops:
   - git
@@ -111,8 +89,6 @@ devops:
   - ci
   - cd
   - terraform
-  - 
-  - 
 
 ai-ml:
   - llm
@@ -124,8 +100,6 @@ ai-ml:
   - neural
   - train
   - inference
-  - 
-  - 
 
 text-processing:
   - text
@@ -136,10 +110,6 @@ text-processing:
   - translate
   - transcri
   - markdown
-  - 
-  - 
-  - 
-  - 
 
 math:
   - math
@@ -147,9 +117,6 @@ math:
   - compute
   - statistics
   - formula
-  - 
-  - 
-  - 
 
 media:
   - image
@@ -164,11 +131,6 @@ media:
   - visualiz
   - gif
   - canvas
-  - 
-  - 
-  - 
-  - 
-  - 
 
 terminal:
   - terminal
@@ -177,9 +139,6 @@ terminal:
   - shell
   - cli
   - bash
-  - 
-  - 
-  - 
 
 code-tools:
   - generate
@@ -192,10 +151,6 @@ code-tools:
   - build
   - mcp
   - skill
-  - 
-  - 
-  - 
-  - 
 
 search:
   - search
@@ -204,9 +159,6 @@ search:
   - lookup
   - retrieve
   - index
-  - 
-  - 
-  - 
 
 finance:
   - finance
@@ -215,10 +167,6 @@ finance:
   - trading
   - payment
   - invoice
-  - 
-  - 
-  - 
-  - 
 
 design:
   - design
@@ -231,6 +179,3 @@ design:
   - ui
   - ux
   - figma
-  - 
-  - 
-  - 

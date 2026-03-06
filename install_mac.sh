@@ -293,72 +293,20 @@ PY
 configure_retrieval_models() {
     ensure_env_file
 
-    echo ""
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}                Embedding / Rerank Configuration               ${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
-    echo ""
-
-    if ask_yes_no "Do you want to use Embedding API?" "N"; then
-        local emb_model emb_base emb_key
-        emb_model="$(ask_non_empty "Embedding model (e.g. BAAI/bge-m3)")"
-        emb_base="$(ask_non_empty "Embedding API base URL")"
-        emb_key="$(ask_non_empty "Embedding API key")"
-
-        set_env_var "EMBEDDING_MODEL" "$emb_model"
-        set_env_var "EMBEDDING_BASE_URL" "$emb_base"
-        set_env_var "EMBEDDING_API_KEY" "$emb_key"
-        EMBEDDING_DOWNLOAD_REQUIRED=false
-        log_success "Embedding configured with API."
-    else
-        if ask_yes_no "No Embedding API. Download local embedding model (BAAI/bge-m3)?" "Y"; then
-            set_env_var "EMBEDDING_MODEL" "BAAI/bge-m3"
-            set_env_var "EMBEDDING_BASE_URL" ""
-            set_env_var "EMBEDDING_API_KEY" ""
-            EMBEDDING_DOWNLOAD_REQUIRED=true
-            log_info "Will download local embedding model."
-        else
-            set_env_var "EMBEDDING_MODEL" ""
-            set_env_var "EMBEDDING_BASE_URL" ""
-            set_env_var "EMBEDDING_API_KEY" ""
-            set_env_var "EMBEDDING_WEIGHT" "0"
-            set_env_var "BM25_WEIGHT" "1"
-            EMBEDDING_DOWNLOAD_REQUIRED=false
-            log_info "Embedding disabled. BM25-only retrieval enabled (BM25_WEIGHT=1, EMBEDDING_WEIGHT=0)."
-        fi
-    fi
-
-    if ask_yes_no "Do you want to use Rerank API?" "N"; then
-        local rerank_model rerank_base rerank_key
-        rerank_model="$(ask_non_empty "Rerank model (e.g. BAAI/bge-reranker-v2-m3)")"
-        rerank_base="$(ask_non_empty "Rerank API base URL")"
-        rerank_key="$(ask_non_empty "Rerank API key")"
-
-        set_env_var "RERANKER_ENABLED" "true"
-        set_env_var "RERANKER_MODEL" "$rerank_model"
-        set_env_var "RERANKER_BASE_URL" "$rerank_base"
-        set_env_var "RERANKER_API_KEY" "$rerank_key"
-        RERANK_DOWNLOAD_REQUIRED=false
-        log_success "Reranker configured with API."
-    else
-        if ask_yes_no "No Rerank API. Download local rerank model (BAAI/bge-reranker-v2-m3)?" "N"; then
-            set_env_var "RERANKER_ENABLED" "true"
-            set_env_var "RERANKER_MODEL" "BAAI/bge-reranker-v2-m3"
-            set_env_var "RERANKER_BASE_URL" ""
-            set_env_var "RERANKER_API_KEY" ""
-            RERANK_DOWNLOAD_REQUIRED=true
-            log_info "Will download local rerank model."
-        else
-            set_env_var "RERANKER_ENABLED" "false"
-            set_env_var "RERANKER_MODEL" ""
-            set_env_var "RERANKER_BASE_URL" ""
-            set_env_var "RERANKER_API_KEY" ""
-            RERANK_DOWNLOAD_REQUIRED=false
-            log_info "Rerank disabled."
-        fi
-    fi
-
-    log_success "Retrieval model configuration written to .env"
+    log_info "Setting default retrieval config: BM25-only, top_k=5, no embedding, no rerank."
+    set_env_var "EMBEDDING_MODEL" "none"
+    set_env_var "EMBEDDING_BASE_URL" ""
+    set_env_var "EMBEDDING_API_KEY" ""
+    set_env_var "EMBEDDING_WEIGHT" "0"
+    set_env_var "BM25_WEIGHT" "1"
+    set_env_var "RERANKER_ENABLED" "false"
+    set_env_var "RERANKER_MODEL" ""
+    set_env_var "RERANKER_BASE_URL" ""
+    set_env_var "RERANKER_API_KEY" ""
+    set_env_var "RETRIEVAL_TOP_K" "5"
+    EMBEDDING_DOWNLOAD_REQUIRED=false
+    RERANK_DOWNLOAD_REQUIRED=false
+    log_success "Retrieval config: BM25-only, RETRIEVAL_TOP_K=5"
 }
 
 download_optional_models() {
@@ -391,31 +339,90 @@ download_optional_models() {
     fi
 }
 
-run_post_install_config() {
-    local py="$PROJECT_ROOT/.venv/bin/python"
-    if [ ! -x "$py" ]; then
-        log_warn ".venv not found, skipping post-install config commands."
-        return
+configure_llm_and_keys() {
+    ensure_env_file
+
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}                    LLM & API Configuration                    ${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # --- LLM_API ---
+    echo -e "${YELLOW}Select LLM Provider:${NC}"
+    echo "  1) anthropic"
+    echo "  2) openai"
+    echo "  3) google"
+    echo "  4) openrouter"
+    echo "  5) ollama"
+    local llm_choice
+    read -r -p "Select number [3]: " llm_choice < /dev/tty
+    llm_choice="${llm_choice:-3}"
+    local llm_api
+    case "$llm_choice" in
+        1) llm_api="anthropic" ;;
+        2) llm_api="openai" ;;
+        3) llm_api="google" ;;
+        4) llm_api="openrouter" ;;
+        5) llm_api="ollama" ;;
+        *) llm_api="google" ;;
+    esac
+    set_env_var "LLM_API" "$llm_api"
+    log_success "LLM Provider: $llm_api"
+
+    # --- LLM_MODEL ---
+    local default_model="google/gemini-3-flash-preview"
+    local llm_model
+    read -r -p "LLM Model [$default_model]: " llm_model < /dev/tty
+    llm_model="${llm_model:-$default_model}"
+    set_env_var "LLM_MODEL" "$llm_model"
+    log_success "LLM Model: $llm_model"
+
+    # --- LLM_API_KEY ---
+    local llm_key
+    read -r -p "LLM API Key: " llm_key < /dev/tty
+    if [[ -n "$llm_key" ]]; then
+        set_env_var "LLM_API_KEY" "$llm_key"
+        log_success "LLM API Key: set"
+    else
+        log_warn "LLM API Key: skipped (set it later in .env)"
     fi
 
-    if [ ! -f "$PROJECT_ROOT/cli/main.py" ]; then
-        log_warn "cli/main.py not found in $PROJECT_ROOT, skipping config commands."
-        return
+    # --- LLM_BASE_URL ---
+    local llm_base
+    read -r -p "LLM Base URL (press Enter to skip): " llm_base < /dev/tty
+    if [[ -n "$llm_base" ]]; then
+        set_env_var "LLM_BASE_URL" "$llm_base"
+        log_success "LLM Base URL: $llm_base"
+    else
+        set_env_var "LLM_BASE_URL" ""
+        log_info "LLM Base URL: default"
     fi
 
-    log_info "Running post-install config commands..."
-    cd "$PROJECT_ROOT" || {
-        log_warn "Failed to cd into $PROJECT_ROOT for config commands."
-        return
-    }
-
-    if ! "$py" cli/main.py config list; then
-        log_warn "Failed to run 'python cli/main.py config list'. You can run it manually later."
+    # --- SERPER_API_KEY ---
+    echo ""
+    local serper_key
+    read -r -p "Serper API Key (for web search, press Enter to skip): " serper_key < /dev/tty
+    if [[ -n "$serper_key" ]]; then
+        set_env_var "SERPER_API_KEY" "$serper_key"
+        log_success "Serper API Key: set"
+    else
+        log_warn "Serper API Key: skipped (web search will be unavailable)"
     fi
 
-    if ! "$py" cli/main.py config; then
-        log_warn "Failed to run 'python cli/main.py config'. You can run it manually later."
-    fi
+    # --- Defaults ---
+    set_env_var "LLM_MAX_TOKENS" "4096"
+    set_env_var "LLM_TEMPERATURE" "0.7"
+    set_env_var "LLM_TIMEOUT" "120"
+    set_env_var "AGENT_MAX_ITERATIONS" "100"
+    set_env_var "LOG_LEVEL" "INFO"
+    set_env_var "EMBEDDING_MODEL" "none"
+    set_env_var "SKILLS_CATALOG_PATH" "router_data/skills_catalog.jsonl"
+    set_env_var "WORKSPACE_DIR" "workspace"
+    set_env_var "CONVERSATIONS_DIR" "conversations"
+
+    echo ""
+    log_success "Configuration written to .env"
 }
 
 init_vector_db() {
@@ -485,10 +492,9 @@ main() {
     install_nvm_and_nodejs
     install_openskills
 
+    configure_llm_and_keys
     configure_retrieval_models
     download_optional_models
-
-    run_post_install_config
 
     init_vector_db
 

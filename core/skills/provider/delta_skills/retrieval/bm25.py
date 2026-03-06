@@ -4,7 +4,10 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional, Tuple
 
-import jieba
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=SyntaxWarning)
+    import jieba
 from rank_bm25 import BM25Okapi
 
 from core.config.logging import get_logger
