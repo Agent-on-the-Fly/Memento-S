@@ -18,7 +18,7 @@ if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
 else
     echo ""
     echo -e "${CYAN}Detected curl | bash mode. Need to clone the repository first.${NC}"
-    read -r -p "Install directory [$DEFAULT_INSTALL_DIR]: " INSTALL_DIR
+    read -r -p "Install directory [$DEFAULT_INSTALL_DIR]: " INSTALL_DIR < /dev/tty
     INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 
     if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/requirements.txt" ]; then
@@ -65,10 +65,10 @@ ask_yes_no() {
 
     while true; do
         if [[ "$default_answer" == "Y" ]]; then
-            read -r -p "$prompt [Y/n]: " reply
+            read -r -p "$prompt [Y/n]: " reply < /dev/tty
             reply="${reply:-Y}"
         else
-            read -r -p "$prompt [y/N]: " reply
+            read -r -p "$prompt [y/N]: " reply < /dev/tty
             reply="${reply:-N}"
         fi
 
@@ -84,7 +84,7 @@ ask_non_empty() {
     local prompt="$1"
     local value
     while true; do
-        read -r -p "$prompt: " value
+        read -r -p "$prompt: " value < /dev/tty
         if [[ -n "$value" ]]; then
             echo "$value"
             return 0
