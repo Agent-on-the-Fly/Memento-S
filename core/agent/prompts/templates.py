@@ -108,9 +108,10 @@ SKILLS_SECTION: Final[str] = """## Skill System
 Relevant skills are automatically suggested in user messages under a `[Matched Skills]` section.
 
 **When you see matched skills relevant to the task:**
-1. Use `read_skill` with the skill name to learn how it works and get the correct execution path.
-2. Execute the skill's scripts via `bash_tool`: `cd <skill_dir> && python3 scripts/<script>.py <args>`. Do NOT use `uv run python` for skill scripts.
-3. NEVER guess Python import paths like `from skills.xxx import ...` — this will always fail. Always `read_skill` first.
+1. Use `read_skill` with the skill name to learn how it works.
+2. **If the skill has a `scripts/` directory**: run via `cd <skill_dir> && python3 scripts/<script>.py <args>`. Do NOT use `uv run python`.
+3. **If the skill is knowledge-only (no `scripts/` directory)**: read the SKILL.md and write your own inline code via `bash_tool` following its instructions. Do NOT attempt `from scripts.xxx import ...` — those files do not exist.
+4. NEVER guess import paths. Always `read_skill` first and follow the hint it provides.
 
 **IMPORTANT — when to use skills:**
 If you are not certain about the answer, or the question involves specific people, organizations, current events, or facts you are not fully confident about, always use a matched skill (such as web-search) rather than guessing.

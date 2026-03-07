@@ -222,13 +222,21 @@ async def read_skill_tool(skill_name: str) -> str:
         skill_md = skills_dir / dirname / "SKILL.md"
         if skill_md.exists():
             skill_dir = skill_md.parent
+            scripts_dir = skill_dir / "scripts"
             content = await asyncio.to_thread(skill_md.read_text, "utf-8")
-            hint = (
-                f"[Skill Location] {skill_dir}\n"
-                f"To run scripts in this skill, use: "
-                f"cd {skill_dir} && python3 scripts/<script>.py <args>\n"
-                f"Do NOT use `from skills.* import ...` — always run scripts via bash_tool with the path above.\n\n"
-            )
+            if scripts_dir.is_dir():
+                hint = (
+                    f"[Skill Location] {skill_dir}\n"
+                    f"To run scripts: cd {skill_dir} && python3 scripts/<script>.py <args>\n"
+                    f"Do NOT use `from skills.* import ...` — always cd into the skill dir first.\n\n"
+                )
+            else:
+                hint = (
+                    f"[Skill Location] {skill_dir}\n"
+                    f"This is a knowledge skill — no scripts/ directory. "
+                    f"Read the SKILL.md below and write inline code via bash_tool following its instructions. "
+                    f"Do NOT attempt `from scripts.* import ...` — the files do not exist.\n\n"
+                )
             return hint + content
     return f"ERR: skill '{skill_name}' not found. Available skills are in the [Matched Skills] section."
 
