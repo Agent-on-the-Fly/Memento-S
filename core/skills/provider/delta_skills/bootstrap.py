@@ -34,11 +34,14 @@ def _ensure_builtin_skills_synced() -> None:
 
     to_sync = []
     for name in builtin_names:
+        src = builtin_skills_root / name
         dst = workspace_skills_root / name
         if not dst.exists():
             to_sync.append((name, "missing"))
         elif not (dst / "SKILL.md").exists():
             to_sync.append((name, "no_skill_md"))
+        elif (src / "scripts").is_dir() and not (dst / "scripts").is_dir():
+            to_sync.append((name, "missing_scripts"))
 
     for name, reason in sorted(to_sync, key=lambda x: x[0]):
         src = builtin_skills_root / name

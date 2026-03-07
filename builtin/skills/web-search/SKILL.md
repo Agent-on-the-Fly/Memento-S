@@ -13,46 +13,32 @@ Search the web and fetch content from URLs.
 
 Search Google via Serper and return organic results.
 
-```python
-from scripts.search import google_search
-
-# Search for information
-results = google_search("quantum computing", num_results=5)
-
-# Each result contains: title, link, snippet, position
-for r in results:
-    print(r["title"], r["link"])
+```bash
+cd <skill_dir> && python3 scripts/search.py "quantum computing" --num 5
 ```
 
-**Parameters:**
-- `query` (str): Search query
-- `num_results` (int): Number of results, default 10
+Output: JSON list of dicts with `title`, `link`, `snippet`, `position`.
 
-**Returns:** List of dicts with `title`, `link`, `snippet`, `position`
+**Arguments:**
+- `query` (positional): Search query
+- `--num` (optional): Number of results, default 10
 
 ### `scripts/fetch.py` - Fetch URL Content
 
 Fetch and extract markdown content from a URL using crawl4ai.
 
-```python
-from scripts.fetch import fetch
-
-# Fetch page content as markdown
-content = fetch("https://example.com")
-
-# Fetch with custom max length
-content = fetch("https://example.com", max_length=100000)
-
-# Fetch raw HTML
-html = fetch("https://example.com", raw=True)
+```bash
+cd <skill_dir> && python3 scripts/fetch.py "https://example.com"
+cd <skill_dir> && python3 scripts/fetch.py "https://example.com" --max-length 100000
+cd <skill_dir> && python3 scripts/fetch.py "https://example.com" --raw
 ```
 
-**Parameters:**
-- `url` (str): URL to fetch
-- `max_length` (int): Max content length, default 50000
-- `raw` (bool): Return raw HTML instead of markdown, default False
+Output: Markdown (or HTML) content string.
 
-**Returns:** Markdown (or HTML) content string
+**Arguments:**
+- `url` (positional): URL to fetch
+- `--max-length` (optional): Max content length, default 50000
+- `--raw` (optional flag): Return raw HTML instead of markdown
 
 ## Guardrails For `fetch`
 
@@ -63,102 +49,18 @@ html = fetch("https://example.com", raw=True)
 
 ## Workflow
 
-1. **Search**: Use `google_search()` to find relevant pages
-2. **Fetch**: Use `fetch()` to get full content from specific URLs
-3. **Extract**: Parse the content to find the information you need
+1. **Search**: `python3 scripts/search.py "<query>"` to find relevant pages
+2. **Fetch**: `python3 scripts/fetch.py "<url>"` to get full content from specific URLs
+3. **Extract**: Parse the output to find the information you need
 
 ## Example
 
-```python
-from scripts.search import google_search
-from scripts.fetch import fetch
-
+```bash
 # Step 1: Search
-results = google_search("Python asyncio tutorial")
+cd <skill_dir> && python3 scripts/search.py "Python asyncio tutorial" --num 5
 
-# Step 2: Fetch top result
-if results:
-    url = results[0]["link"]
-    content = fetch(url)
-    print(content)
-```
-
-## Tool Calls Format (Required)
-
-Return JSON with `tool_calls` array using OpenAI function-call shape.
-Do not use `mcp_call` / `mcp_tool` wrappers.
-
-### `web_search`
-Search Google for information:
-```json
-{
-  "tool_calls": [
-    {
-      "id": "call_1",
-      "type": "function",
-      "function": {
-        "name": "web_search",
-        "arguments": "{\"query\":\"search query\",\"num_results\":10}"
-      }
-    }
-  ]
-}
-```
-
-### `fetch` 
-Fetch content from a URL:
-```json
-{
-  "tool_calls": [
-    {
-      "id": "call_1",
-      "type": "function",
-      "function": {
-        "name": "fetch",
-        "arguments": "{\"url\":\"https://example.com\",\"max_length\":50000,\"raw\":false}"
-      }
-    }
-  ]
-}
-```
-
-### Combined workflow
-Search then fetch:
-```json
-{
-  "tool_calls": [
-    {
-      "id": "call_1",
-      "type": "function",
-      "function": {
-        "name": "web_search",
-        "arguments": "{\"query\":\"Python asyncio tutorial\",\"num_results\":5}"
-      }
-    }
-  ]
-}
-```
-
-After getting search results, fetch specific URL:
-```json
-{
-  "tool_calls": [
-    {
-      "id": "call_1",
-      "type": "function",
-      "function": {
-        "name": "fetch",
-        "arguments": "{\"url\":\"https://docs.python.org/3/library/asyncio.html\"}"
-      }
-    }
-  ]
-}
-```
-
-### Final answer
-When you have the answer, return:
-```json
-{"final": "Your answer here based on the search/fetch results"}
+# Step 2: Fetch top result (use a URL from the search output)
+cd <skill_dir> && python3 scripts/fetch.py "https://docs.python.org/3/library/asyncio.html"
 ```
 
 ## Requirements
