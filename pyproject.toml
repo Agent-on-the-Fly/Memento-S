@@ -29,6 +29,7 @@ dependencies = [
     "chromadb",
     "jieba>=0.42.1",
     "rank-bm25",
+    "prompt_toolkit",
 ]
 
 [project.scripts]

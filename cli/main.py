@@ -39,6 +39,126 @@ app = typer.Typer(name="MementoS", help="Memento-S Agent CLI", no_args_is_help=T
 app.add_typer(config_app, name="config", help="Manage configuration and .env file.")
 console = Console()
 
+# ── Slash commands ──────────────────────────────────────────────────
+SLASH_COMMANDS = [
+    ("/help",    "Show available commands"),
+    ("/status",  "Show current session status"),
+    ("/config",  "View/update configuration"),
+    ("/history", "List saved sessions or load one"),
+    ("/clear",   "Clear context & start new session"),
+    ("/exit",    "Exit the CLI"),
+]
+
+
+def _print_help() -> None:
+    table = Table(title="Slash Commands", show_header=True, header_style="bold magenta")
+    table.add_column("Command", style="cyan", no_wrap=True)
+    table.add_column("Description", style="dim")
+    for cmd, desc in SLASH_COMMANDS:
+        table.add_row(cmd, desc)
+    console.print(table)
+
+
+def _print_status(session_id: str, agent_instance: "MementoSAgent", turn_count: int) -> None:
+    model = g_settings.llm_model or "default"
+    provider = g_settings.llm_api or "openai"
+    skills = []
+    try:
+        skills = list(agent_instance.skill_manager.skills.keys())
+    except Exception:
+        pass
+
+    console.print(f"  [bold]Model[/bold]      {model} [dim]({provider})[/dim]")
+    console.print(f"  [bold]Session[/bold]    {session_id}")
+    console.print(f"  [bold]Turns[/bold]      {turn_count}")
+    console.print(f"  [bold]Workspace[/bold]  {g_settings.workspace_path}")
+    if skills:
+        console.print(f"  [bold]Skills[/bold]     {', '.join(skills[:15])}" + (" ..." if len(skills) > 15 else ""))
+    console.print()
+
+
+def _handle_clear() -> str:
+    new_id = generate_session_id()
+    console.print(f"  [green]Session cleared.[/green] New session: [bold]{new_id}[/bold]\n")
+    return new_id
+
+
+def _handle_history(args: str, agent_instance: "MementoSAgent") -> str | None:
+    """Handle /history commands. Returns new session_id if loading, else None."""
+    parts = args.strip().split()
+
+    # /history load <id>
+    if len(parts) >= 2 and parts[0] == "load":
+        target = parts[1]
+        existing = agent_instance.session_manager.list_sessions()
+        if target not in existing:
+            console.print(f"  [red]Session '{target}' not found.[/red]")
+            return None
+        console.print(f"  [green]Switched to session:[/green] [bold]{target}[/bold]\n")
+        return target
+
+    # /history [N]
+    sessions = agent_instance.session_manager.list_sessions()
+    if not sessions:
+        console.print("  [dim]No saved sessions.[/dim]\n")
+        return None
+
+    limit = 20
+    if parts and parts[0].isdigit():
+        limit = int(parts[0])
+
+    table = Table(title="Sessions", show_header=True, header_style="bold magenta")
+    table.add_column("#", style="dim", no_wrap=True)
+    table.add_column("Session ID", style="cyan")
+    table.add_column("Title", style="green")
+
+    for idx, sid in enumerate(sessions[:limit], 1):
+        title = ""
+        try:
+            data = agent_instance.session_manager.get_session(sid)
+            title = (data or {}).get("title", "")
+        except Exception:
+            pass
+        table.add_row(str(idx), sid, title or "[dim]-[/dim]")
+
+    console.print(table)
+    if len(sessions) > limit:
+        console.print(f"  [dim]Showing {limit}/{len(sessions)}. Use /history {limit + 20} to see more.[/dim]")
+    console.print(f"  [dim]Load a session: /history load <session_id>[/dim]\n")
+    return None
+
+
+def _handle_config_inline(args: str) -> None:
+    """Handle /config sub-commands inline."""
+    from cli.config import list_config, get_config, set_config, unset_config
+
+    parts = args.strip().split(maxsplit=2)
+    sub = parts[0] if parts else ""
+
+    if sub in ("", "show", "list"):
+        list_config()
+    elif sub == "get" and len(parts) >= 2:
+        get_config(parts[1])
+    elif sub == "set" and len(parts) >= 3:
+        set_config(parts[1], parts[2])
+    elif sub == "unset" and len(parts) >= 2:
+        unset_config(parts[1])
+    else:
+        console.print("  [dim]Usage: /config [show|get <key>|set <key> <val>|unset <key>][/dim]")
+
+
+def _suggest_command(cmd: str) -> None:
+    """Suggest a similar slash command for unknown input."""
+    import difflib
+    known = [c for c, _ in SLASH_COMMANDS]
+    matches = difflib.get_close_matches(cmd, known, n=1, cutoff=0.4)
+    console.print(f"  [yellow]Unknown command: {cmd}[/yellow]")
+    if matches:
+        console.print(f"  [dim]Did you mean [bold]{matches[0]}[/bold]?[/dim]")
+    else:
+        console.print("  [dim]Type /help for available commands.[/dim]")
+    console.print()
+
 
 def memento_entry() -> None:
     if len(sys.argv) == 1:
@@ -149,9 +269,10 @@ def _print_agent_response(response: str, render_markdown: bool) -> None:
 
 class _StreamRenderer:
 
-    def __init__(self, render_markdown: bool) -> None:
+    def __init__(self, render_markdown: bool, quiet: bool = False) -> None:
         self._accumulated = ""
         self._render_markdown = render_markdown
+        self._quiet = quiet
         self._dispatch = {
             "status": self._on_status,
             "text_delta": self._on_text_delta,
@@ -167,6 +288,9 @@ class _StreamRenderer:
             handler(event)
 
     def flush(self) -> None:
+        if self._quiet:
+            self._accumulated = ""
+            return
         if self._accumulated.strip():
             clean = re.sub(r"</?thought>", "", self._accumulated).strip()
             if clean:
@@ -175,19 +299,24 @@ class _StreamRenderer:
 
     def _on_status(self, event: dict) -> None:
         self.flush()
-        console.print(Rule(event["message"], style="cyan"))
+        if not self._quiet:
+            console.print(Rule(event["message"], style="cyan"))
 
     def _on_text_delta(self, event: dict) -> None:
         self._accumulated += event["content"]
 
     def _on_skill_call_start(self, event: dict) -> None:
         self.flush()
+        if self._quiet:
+            return
         name = event["skill_name"]
         args = json.dumps(event.get("arguments", {}), ensure_ascii=False)
         console.print(f"  [bold yellow]{name}[/bold yellow]")
         console.print(f"    [dim]IN:[/dim]  {args[:300]}")
 
     def _on_skill_call_result(self, event: dict) -> None:
+        if self._quiet:
+            return
         result = str(event.get("result", ""))
         preview = result[:500] + "..." if len(result) > 500 else result
         console.print(f"    [dim]OUT:[/dim] {preview}")
@@ -205,8 +334,9 @@ async def _run_stream(
     session_id: str,
     message: str,
     render_markdown: bool,
+    quiet: bool = False,
 ) -> None:
-    renderer = _StreamRenderer(render_markdown)
+    renderer = _StreamRenderer(render_markdown, quiet=quiet)
     async for event in agent_instance.reply_stream(session_id=session_id, user_content=message):
         renderer.handle(event)
     renderer.flush()
@@ -217,8 +347,11 @@ async def _run_interactive(
     session_id: str,
     inp: _InteractiveInput,
     render_markdown: bool,
+    quiet: bool = False,
 ) -> None:
     _EXIT_COMMANDS = frozenset({"/q", ":q", "exit", "quit", "/exit", "/quit"})
+    state = {"session_id": session_id, "turns": 0}
+
     while True:
         try:
             inp.flush()
@@ -226,10 +359,49 @@ async def _run_interactive(
             command = user_input.strip()
             if not command:
                 continue
-            if command.lower() in _EXIT_COMMANDS:
+
+            low = command.lower()
+
+            # ── exit ────────────────────────────────────────────
+            if low in _EXIT_COMMANDS:
                 inp.teardown()
                 return
-            await _run_stream(agent_instance, session_id, command, render_markdown)
+
+            # ── slash commands ──────────────────────────────────
+            if low in ("/", "/help", "help"):
+                _print_help()
+                continue
+
+            if low in ("/status", "status"):
+                _print_status(state["session_id"], agent_instance, state["turns"])
+                continue
+
+            if low in ("/clear", "clear"):
+                state["session_id"] = _handle_clear()
+                state["turns"] = 0
+                continue
+
+            if low.startswith("/history"):
+                args = command[len("/history"):].strip()
+                new_sid = _handle_history(args, agent_instance)
+                if new_sid is not None:
+                    state["session_id"] = new_sid
+                    state["turns"] = 0
+                continue
+
+            if low.startswith("/config"):
+                args = command[len("/config"):].strip()
+                _handle_config_inline(args)
+                continue
+
+            # ── unknown slash command ───────────────────────────
+            if command.startswith("/"):
+                _suggest_command(command.split()[0])
+                continue
+
+            # ── normal message → agent ──────────────────────────
+            await _run_stream(agent_instance, state["session_id"], command, render_markdown, quiet=quiet)
+            state["turns"] += 1
         except (KeyboardInterrupt, EOFError):
             inp.teardown()
             return
@@ -245,6 +417,7 @@ def agent(
     message: str = typer.Option(None, "--message", "-m", help="Single message (non-interactive)"),
     session_id: str | None = typer.Option(None, "--session", "-s", help="Session ID"),
     markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render output as Markdown"),
+    quiet: bool = typer.Option(False, "--quiet/--no-quiet", "-q", help="Only show final agent response"),
     logs: bool = typer.Option(False, "--logs/--no-logs", help="Show verbose logs"),
 ) -> None:
     session_id = session_id or generate_session_id()
@@ -258,15 +431,15 @@ def agent(
     _print_banner(workspace, session_id)
 
     if message:
-        asyncio.run(_run_stream(agent_instance, session_id, message, render_markdown=markdown))
+        asyncio.run(_run_stream(agent_instance, session_id, message, render_markdown=markdown, quiet=quiet))
         return
 
     inp = _InteractiveInput()
     inp.setup()
-    console.print("[dim]Interactive mode. Type [bold]exit[/bold] or [bold]Ctrl+C[/bold] to quit.[/dim]\n")
+    console.print("[dim]Interactive mode. Type [bold]/help[/bold] for commands, [bold]/exit[/bold] or [bold]Ctrl+C[/bold] to quit.[/dim]\n")
 
     signal.signal(signal.SIGINT, functools.partial(_sigint_handler, inp))
-    asyncio.run(_run_interactive(agent_instance, session_id, inp, render_markdown=markdown))
+    asyncio.run(_run_interactive(agent_instance, session_id, inp, render_markdown=markdown, quiet=quiet))
 
 
 def _secret_display(key_lower: str, value: object) -> str:
