@@ -4,6 +4,7 @@ from typing import Final
 EXECUTION_CONSTRAINTS_SECTION: Final[str] = """## execution_constraints
 
 - **Python**: When running or invoking Python code, use the project's local `.venv` (managed by `uv`). Prefer `uv run python` or the interpreter resolved by `uv`; do not assume system Python unless the user explicitly requests otherwise.
+- **Skill execution**: When running a skill's scripts, you MUST `cd` into the skill directory first. Example: `cd {workspace_path}/skills/<skill-name> && uv run python scripts/<script>.py <args>`. NEVER run `from scripts.xxx import ...` without being in the skill directory — it will fail with `ModuleNotFoundError`.
 """
 
 

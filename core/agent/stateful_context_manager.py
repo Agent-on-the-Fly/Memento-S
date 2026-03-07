@@ -60,7 +60,7 @@ class StatefulContextManager:
             current_time=now,
             runtime=runtime,
             workspace_paths_note=workspace_paths_note,
-            execution_constraints=EXECUTION_CONSTRAINTS_SECTION,
+            execution_constraints=EXECUTION_CONSTRAINTS_SECTION.format(workspace_path=workspace_path),
             important_direct_reply=IMPORTANT_DIRECT_REPLY,
         )
 

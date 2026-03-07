@@ -24,6 +24,7 @@ aiohttp
 requests>=2.31.0,<2.33
 urllib3>=1.26.18,<3
 charset-normalizer>=3.0,<4
+chardet>=3.0.2,<6
 
 aiofiles
 anyio
