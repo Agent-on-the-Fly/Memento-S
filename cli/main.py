@@ -162,29 +162,19 @@ def memento_entry() -> None:
     app()
 
 
-class _SlashCompleter:
+from prompt_toolkit.completion import Completer, Completion
+
+
+class _SlashCompleter(Completer):
     """prompt_toolkit Completer that shows slash commands in a floating menu."""
 
-    def __init__(self) -> None:
-        from prompt_toolkit.completion import Completer
-        self._base_class = Completer
-
-    def get_completions(self, document, complete_event):  # noqa: D401
-        from prompt_toolkit.completion import Completion
+    def get_completions(self, document, complete_event):
         text = document.text_before_cursor
         if not text.startswith("/"):
             return
         for cmd, desc in SLASH_COMMANDS:
             if cmd.startswith(text):
                 yield Completion(cmd, start_position=-len(text), display_meta=desc)
-
-
-# Register as a proper Completer subclass at import time
-try:
-    from prompt_toolkit.completion import Completer as _Completer
-    _SlashCompleter.__bases__ = (_Completer,)
-except Exception:
-    pass
 
 
 class _InteractiveInput:
@@ -195,7 +185,6 @@ class _InteractiveInput:
     def setup(self) -> None:
         from prompt_toolkit import PromptSession
         from prompt_toolkit.history import FileHistory
-        from prompt_toolkit.formatted_text import HTML
         from prompt_toolkit.styles import Style
 
         history_file = Path.home() / ".memento-s" / "history" / "cli_history"
