@@ -192,7 +192,13 @@ class _InteractiveInput:
 
         style = Style.from_dict({
             "prompt": "bold cyan",
-            "": "",  # default text
+            "": "",
+            # Transparent completion menu (no gray background)
+            "completion-menu":                "noinherit",
+            "completion-menu.completion":     "noinherit",
+            "completion-menu.completion.current": "bold cyan",
+            "completion-menu.meta.completion":          "noinherit #888888",
+            "completion-menu.meta.completion.current":  "noinherit #888888",
         })
         self._session = PromptSession(
             message=[("class:prompt", "You › ")],
