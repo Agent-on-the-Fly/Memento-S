@@ -62,6 +62,7 @@ docs/
 .verify_cache/
 results/*
 scripts/
+!builtin/skills/*/scripts/
 .cursor/
 router_data/.cloud_chroma/
 

@@ -1,13 +1,9 @@
 
 import asyncio
-import atexit
-import functools
 import json
 import logging
 import os
 import re
-import select
-import signal
 import sys
 from pathlib import Path
 
@@ -166,92 +162,63 @@ def memento_entry() -> None:
     app()
 
 
+class _SlashCompleter:
+    """prompt_toolkit Completer that shows slash commands in a floating menu."""
+
+    def __init__(self) -> None:
+        from prompt_toolkit.completion import Completer
+        self._base_class = Completer
+
+    def get_completions(self, document, complete_event):  # noqa: D401
+        from prompt_toolkit.completion import Completion
+        text = document.text_before_cursor
+        if not text.startswith("/"):
+            return
+        for cmd, desc in SLASH_COMMANDS:
+            if cmd.startswith(text):
+                yield Completion(cmd, start_position=-len(text), display_meta=desc)
+
+
+# Register as a proper Completer subclass at import time
+try:
+    from prompt_toolkit.completion import Completer as _Completer
+    _SlashCompleter.__bases__ = (_Completer,)
+except Exception:
+    pass
+
+
 class _InteractiveInput:
 
     def __init__(self) -> None:
-        self._readline = None
-        self._history_file: Path | None = None
-        self._saved_termios = None
-        self._using_libedit = False
-        self._atexit_registered = False
+        self._session = None
 
     def setup(self) -> None:
-        try:
-            import termios
-            self._saved_termios = termios.tcgetattr(sys.stdin.fileno())
-        except Exception:
-            pass
+        from prompt_toolkit import PromptSession
+        from prompt_toolkit.history import FileHistory
+        from prompt_toolkit.formatted_text import HTML
+        from prompt_toolkit.styles import Style
+
         history_file = Path.home() / ".memento-s" / "history" / "cli_history"
         history_file.parent.mkdir(parents=True, exist_ok=True)
-        self._history_file = history_file
-        try:
-            import readline
-        except ImportError:
-            return
-        self._readline = readline
-        self._using_libedit = "libedit" in (readline.__doc__ or "").lower()
-        try:
-            readline.parse_and_bind("tab: complete" if not self._using_libedit else "bind ^I rl_complete")
-            readline.parse_and_bind("set editing-mode emacs")
-        except Exception:
-            pass
-        readline.set_completer(self._completer)
-        readline.set_completer_delims(" \t\n")
-        try:
-            readline.read_history_file(str(history_file))
-        except Exception:
-            pass
-        if not self._atexit_registered:
-            atexit.register(self.teardown, False)
-            self._atexit_registered = True
+
+        style = Style.from_dict({
+            "prompt": "bold cyan",
+            "": "",  # default text
+        })
+        self._session = PromptSession(
+            message=[("class:prompt", "You › ")],
+            history=FileHistory(str(history_file)),
+            completer=_SlashCompleter(),
+            complete_while_typing=True,
+            style=style,
+        )
 
     def teardown(self, say_goodbye: bool = True) -> None:
-        if self._readline is not None and self._history_file is not None:
-            try:
-                self._readline.write_history_file(str(self._history_file))
-            except Exception:
-                pass
-        if self._saved_termios is not None:
-            try:
-                import termios
-                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._saved_termios)
-            except Exception:
-                pass
         if say_goodbye:
             console.print("\n[dim]Bye![/dim]")
 
-    def flush(self) -> None:
-        try:
-            fd = sys.stdin.fileno()
-            if not os.isatty(fd):
-                return
-        except Exception:
-            return
-        try:
-            import termios
-            termios.tcflush(fd, termios.TCIFLUSH)
-        except Exception:
-            try:
-                while select.select([fd], [], [], 0)[0] and os.read(fd, 4096):
-                    pass
-            except Exception:
-                pass
-
-    @staticmethod
-    def _completer(text: str, state: int) -> str | None:
-        if not text.startswith("/"):
-            return None
-        options = [cmd for cmd, _ in SLASH_COMMANDS if cmd.startswith(text)]
-        return options[state] if state < len(options) else None
-
-    def prompt_text(self) -> str:
-        prompt = "You › "
-        if self._readline is None:
-            return prompt
-        cyan_bold, reset = "\033[1;36m", "\033[0m"
-        if self._using_libedit:
-            return f"{cyan_bold}{prompt}{reset}"
-        return f"\001{cyan_bold}\002{prompt}\001{reset}\002"
+    async def prompt_async(self) -> str:
+        return await self._session.prompt_async()
 
 
 def _print_banner(workspace: Path, session_id: str) -> None:
@@ -363,8 +330,7 @@ async def _run_interactive(
 
     while True:
         try:
-            inp.flush()
-            user_input = await asyncio.to_thread(input, inp.prompt_text())
+            user_input = await inp.prompt_async()
             command = user_input.strip()
             if not command:
                 continue
@@ -416,11 +382,6 @@ async def _run_interactive(
             return
 
 
-def _sigint_handler(inp: _InteractiveInput, _signum: int, _frame) -> None:
-    inp.teardown()
-    os._exit(0)
-
-
 @app.command()
 def agent(
     message: str = typer.Option(None, "--message", "-m", help="Single message (non-interactive)"),
@@ -447,7 +408,6 @@ def agent(
     inp.setup()
     console.print("[dim]Interactive mode. Type [bold]/help[/bold] for commands, [bold]/exit[/bold] or [bold]Ctrl+C[/bold] to quit.[/dim]\n")
 
-    signal.signal(signal.SIGINT, functools.partial(_sigint_handler, inp))
     asyncio.run(_run_interactive(agent_instance, session_id, inp, render_markdown=markdown, quiet=quiet))
 
 
