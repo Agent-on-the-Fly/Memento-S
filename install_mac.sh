@@ -415,7 +415,7 @@ configure_llm_and_keys() {
     set_env_var "LLM_TEMPERATURE" "0.7"
     set_env_var "LLM_TIMEOUT" "120"
     set_env_var "AGENT_MAX_ITERATIONS" "100"
-    set_env_var "LOG_LEVEL" "INFO"
+    set_env_var "LOG_LEVEL" "ERROR"
     set_env_var "EMBEDDING_MODEL" "none"
     set_env_var "SKILLS_CATALOG_PATH" "router_data/skills_catalog.jsonl"
     set_env_var "WORKSPACE_DIR" "workspace"
@@ -450,6 +450,54 @@ init_vector_db() {
     log_success "Vector database initialized."
 }
 
+create_global_symlink() {
+    local venv_bin="$PROJECT_ROOT/.venv/bin/memento"
+    local target_dir="$HOME/.local/bin"
+    local target="$target_dir/memento"
+
+    if [ ! -x "$venv_bin" ]; then
+        log_warn "memento entry point not found at $venv_bin, skipping global symlink."
+        return
+    fi
+
+    # Create a wrapper script instead of symlink so it works even if
+    # the venv's Python needs the project directory as cwd.
+    mkdir -p "$target_dir"
+
+    cat > "$target" <<WRAPPER
+#!/usr/bin/env bash
+cd "$PROJECT_ROOT" || exit 1
+exec "$venv_bin" "\$@"
+WRAPPER
+    chmod +x "$target"
+
+    # Ensure ~/.local/bin is on PATH in common shell rc files
+    local added_path=false
+    for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
+        if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc" 2>/dev/null; then
+            echo '' >> "$rc"
+            echo '# Added by Memento-S installer' >> "$rc"
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$rc"
+            added_path=true
+        fi
+    done
+
+    if [[ ":$PATH:" != *":$target_dir:"* ]]; then
+        export PATH="$target_dir:$PATH"
+    fi
+
+    if check_command memento; then
+        log_success "Global command installed: memento"
+    else
+        log_warn "Created $target but it may not be on PATH yet."
+        log_warn "Run: export PATH=\"\$HOME/.local/bin:\$PATH\"  or restart your terminal."
+    fi
+
+    if $added_path; then
+        log_info "Added ~/.local/bin to PATH in shell rc files. Restart terminal to take effect."
+    fi
+}
+
 print_success() {
     echo ""
     echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
@@ -460,13 +508,18 @@ print_success() {
     echo ""
     echo -e "  ${YELLOW}To start Memento-S:${NC}"
     echo ""
-    echo -e "    ${GREEN}cd $PROJECT_ROOT && .venv/bin/memento${NC}"
+    echo -e "    ${GREEN}memento${NC}"
     echo ""
     echo -e "  ${CYAN}Other commands:${NC}"
-    echo -e "    .venv/bin/python tui.py doctor   - Check configuration"
-    echo -e "    .venv/bin/python tui.py config  - Show current config"
-    echo -e "    .venv/bin/python tui.py --help  - Show all commands"
+    echo -e "    memento config    - Manage configuration"
+    echo -e "    memento doctor    - Check configuration"
+    echo -e "    memento --help    - Show all commands"
     echo ""
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        echo -e "  ${YELLOW}Note:${NC} If 'memento' is not found, restart your terminal or run:"
+        echo -e "    export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo ""
+    fi
 }
 
 main() {
@@ -497,6 +550,8 @@ main() {
     download_optional_models
 
     init_vector_db
+
+    create_global_symlink
 
     print_success
 }
