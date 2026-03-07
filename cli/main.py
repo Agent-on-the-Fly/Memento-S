@@ -195,6 +195,8 @@ class _InteractiveInput:
             readline.parse_and_bind("set editing-mode emacs")
         except Exception:
             pass
+        readline.set_completer(self._completer)
+        readline.set_completer_delims(" \t\n")
         try:
             readline.read_history_file(str(history_file))
         except Exception:
@@ -234,6 +236,13 @@ class _InteractiveInput:
                     pass
             except Exception:
                 pass
+
+    @staticmethod
+    def _completer(text: str, state: int) -> str | None:
+        if not text.startswith("/"):
+            return None
+        options = [cmd for cmd, _ in SLASH_COMMANDS if cmd.startswith(text)]
+        return options[state] if state < len(options) else None
 
     def prompt_text(self) -> str:
         prompt = "You › "

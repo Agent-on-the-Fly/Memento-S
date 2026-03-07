@@ -42,6 +42,12 @@ async def bash_tool(command: str, description: str) -> str:
         pass
 
     env = os.environ.copy()
+    # Ensure the project .venv/bin is on PATH so `python3` resolves to
+    # the venv interpreter (with all installed packages).
+    venv_bin = _base_dir.parent / ".venv" / "bin"
+    if venv_bin.is_dir():
+        env["PATH"] = str(venv_bin) + os.pathsep + env.get("PATH", "")
+        env["VIRTUAL_ENV"] = str(venv_bin.parent)
 
     def _run() -> str:
         try:

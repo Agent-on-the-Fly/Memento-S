@@ -4,7 +4,9 @@ from typing import Final
 EXECUTION_CONSTRAINTS_SECTION: Final[str] = """## execution_constraints
 
 - **Python**: When running or invoking Python code, use the project's local `.venv` (managed by `uv`). Prefer `uv run python` or the interpreter resolved by `uv`; do not assume system Python unless the user explicitly requests otherwise.
-- **Skill execution**: When running a skill's scripts, you MUST `cd` into the skill directory first. Example: `cd {workspace_path}/skills/<skill-name> && uv run python scripts/<script>.py <args>`. NEVER run `from scripts.xxx import ...` without being in the skill directory — it will fail with `ModuleNotFoundError`.
+- **Skill execution** (CRITICAL — overrides the Python rule above): When running a skill's scripts, you MUST `cd` into the skill directory and use `python3` (NOT `uv run python`). `uv run` walks up to find the project's `pyproject.toml` and changes the execution context, breaking `scripts.*` imports. Correct pattern:
+  `cd {workspace_path}/skills/<skill-name> && python3 scripts/<script>.py <args>`
+  The `python3` command in bash_tool already points to the project's `.venv` Python with all packages installed. NEVER use `uv run python` for skill scripts. NEVER run `from scripts.xxx import ...` without `cd` into the skill directory first.
 """
 
 
@@ -107,7 +109,7 @@ Relevant skills are automatically suggested in user messages under a `[Matched S
 
 **When you see matched skills relevant to the task:**
 1. Use `read_skill` with the skill name to learn how it works and get the correct execution path.
-2. Execute the skill's scripts/commands via `bash_tool` using the path shown by `read_skill`.
+2. Execute the skill's scripts via `bash_tool`: `cd <skill_dir> && python3 scripts/<script>.py <args>`. Do NOT use `uv run python` for skill scripts.
 3. NEVER guess Python import paths like `from skills.xxx import ...` — this will always fail. Always `read_skill` first.
 
 **IMPORTANT — when to use skills:**
