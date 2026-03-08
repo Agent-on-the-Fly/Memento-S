@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import mimetypes
 import os
 import subprocess
@@ -12,15 +11,48 @@ from typing import Any, Callable, Coroutine
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
 _IMAGE_MAX_BYTES = 20 * 1024 * 1024  # 20 MB
 
+
+def _image_dimensions(p: Path) -> tuple[int, int] | None:
+    """Try to read image width x height without heavy dependencies."""
+    try:
+        from PIL import Image
+        with Image.open(p) as img:
+            return img.size  # (width, height)
+    except Exception:
+        pass
+    # Lightweight PNG header parse (first 24 bytes contain IHDR w/h)
+    try:
+        if p.suffix.lower() == ".png":
+            data = p.read_bytes()[:32]
+            if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) >= 24:
+                import struct
+                w, h = struct.unpack(">II", data[16:24])
+                return (w, h)
+    except Exception:
+        pass
+    return None
+
+
 _base_dir: Path = Path.cwd()
 _skill_library: Any = None
+_cloud_catalog: Any = None
+_skill_manager: Any = None
 
 
-def configure(workspace: Path, skill_library: Any = None) -> None:
-    global _base_dir, _skill_library
+def configure(
+    workspace: Path,
+    skill_library: Any = None,
+    cloud_catalog: Any = None,
+    skill_manager: Any = None,
+) -> None:
+    global _base_dir, _skill_library, _cloud_catalog, _skill_manager
     _base_dir = Path(workspace).expanduser().resolve()
     if skill_library is not None:
         _skill_library = skill_library
+    if cloud_catalog is not None:
+        _cloud_catalog = cloud_catalog
+    if skill_manager is not None:
+        _skill_manager = skill_manager
 
 
 def _resolve_path(raw: str) -> Path:
@@ -150,8 +182,15 @@ async def view_tool(
             if size > _IMAGE_MAX_BYTES:
                 return f"view ERR: image too large ({size} bytes, max {_IMAGE_MAX_BYTES})"
             mime = mimetypes.guess_type(str(p))[0] or "image/png"
-            b64 = base64.b64encode(p.read_bytes()).decode("ascii")
-            return f"data:{mime};base64,{b64}"
+            # Return metadata instead of full base64 to avoid blowing up
+            # the conversation context with megabytes of encoded data.
+            dims = _image_dimensions(p)
+            dim_str = f", dimensions={dims[0]}x{dims[1]}" if dims else ""
+            return (
+                f"[Image] path={p}, format={mime}, size={size} bytes{dim_str}\n"
+                "To analyze this image, use `route_skill(\"analyze an image\")` "
+                "to find a suitable skill, or describe what you need from it."
+            )
 
         try:
             content = p.read_text(encoding="utf-8", errors="replace")
@@ -218,28 +257,80 @@ async def read_skill_tool(skill_name: str) -> str:
     from core.skills.provider.delta_skills.skills.store.persistence import to_kebab_case
 
     skills_dir = g_settings.workspace_path / "skills"
-    for dirname in [skill_name, to_kebab_case(skill_name), skill_name.replace("-", "_")]:
-        skill_md = skills_dir / dirname / "SKILL.md"
-        if skill_md.exists():
-            skill_dir = skill_md.parent
-            scripts_dir = skill_dir / "scripts"
-            content = await asyncio.to_thread(skill_md.read_text, "utf-8")
-            if scripts_dir.is_dir():
-                hint = (
-                    f"[Skill Location] {skill_dir}\n"
-                    f"To run scripts: cd {skill_dir} && python3 scripts/<script>.py <args>\n"
-                    f"Do NOT use `from skills.* import ...` — always cd into the skill dir first.\n\n"
+
+    def _try_read_local(sdir: Path, name: str) -> str | None:
+        for dirname in [name, to_kebab_case(name), name.replace("-", "_")]:
+            skill_md = sdir / dirname / "SKILL.md"
+            if skill_md.exists():
+                skill_dir = skill_md.parent
+                scripts_dir = skill_dir / "scripts"
+                content = skill_md.read_text("utf-8")
+                if scripts_dir.is_dir():
+                    hint = (
+                        f"[Skill Location] {skill_dir}\n"
+                        f"To run scripts: cd {skill_dir} && python3 scripts/<script>.py <args>\n"
+                        f"Do NOT use `from skills.* import ...` — always cd into the skill dir first.\n\n"
+                    )
+                else:
+                    hint = (
+                        f"[Skill Location] {skill_dir}\n"
+                        f"This is a knowledge skill — no scripts/ directory. "
+                        f"Read the SKILL.md below and write inline code via bash_tool following its instructions. "
+                        f"Do NOT attempt `from scripts.* import ...` — the files do not exist.\n\n"
+                    )
+                return hint + content
+        return None
+
+    # 1. Try local
+    result = await asyncio.to_thread(_try_read_local, skills_dir, skill_name)
+    if result is not None:
+        return result
+
+    # 2. Fallback: try downloading from cloud catalog
+    if _cloud_catalog is not None:
+        try:
+            from core.skills.provider.delta_skills.importers.utils import download_with_strategy
+
+            entry = _cloud_catalog.get_by_name(skill_name)
+            if entry and entry.github_url:
+                local_path = await asyncio.to_thread(
+                    download_with_strategy,
+                    entry.github_url,
+                    skills_dir,
+                    entry.name,
                 )
-            else:
-                hint = (
-                    f"[Skill Location] {skill_dir}\n"
-                    f"This is a knowledge skill — no scripts/ directory. "
-                    f"Read the SKILL.md below and write inline code via bash_tool following its instructions. "
-                    f"Do NOT attempt `from scripts.* import ...` — the files do not exist.\n\n"
-                )
-            return hint + content
+                if local_path:
+                    # Refresh library so the skill is indexed
+                    if _skill_library:
+                        try:
+                            _skill_library.refresh_from_disk()
+                        except Exception:
+                            pass
+                    # Re-try local read after download
+                    result = await asyncio.to_thread(
+                        _try_read_local, skills_dir, skill_name,
+                    )
+                    if result is not None:
+                        return result
+        except Exception:
+            pass
+
     return f"ERR: skill '{skill_name}' not found. Available skills are in the [Matched Skills] section."
 
+
+async def route_skill_tool(query: str) -> str:
+    """Find the most relevant skills for a sub-task via semantic retrieval."""
+    if not query.strip():
+        return "route_skill ERR: empty query"
+    if _skill_manager is None:
+        return "route_skill ERR: skill_manager not configured"
+    try:
+        context = _skill_manager.get_matched_skills_context(query)
+        if context:
+            return context
+        return "No matching skills found for this query. Consider using `skill-creator` to build one."
+    except Exception as exc:
+        return f"route_skill ERR: {type(exc).__name__}: {exc}"
 
 
 BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -327,7 +418,7 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "view",
             "description": (
-                "View text files (with line numbers), directories (tree listing), or images (base64). "
+                "View text files (with line numbers), directories (tree listing), or images (metadata summary). "
                 "Supports optional line range for text files."
             ),
             "parameters": {
@@ -371,6 +462,28 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "route_skill",
+            "description": (
+                "Find the most relevant skills for a sub-task. "
+                "Use this when you encounter a new sub-problem and need to discover "
+                "which skills (local or cloud) can help. Returns a ranked list of "
+                "matching skills — then call `read_skill` on the one you want to use."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Describe the sub-task you need a skill for (e.g. 'parse a PDF and extract tables')",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 
@@ -381,6 +494,7 @@ BUILTIN_TOOL_REGISTRY: dict[str, Callable[..., Coroutine[Any, Any, str]]] = {
     "file_create": file_create_tool,
     "view": view_tool,
     "read_skill": read_skill_tool,
+    "route_skill": route_skill_tool,
 }
 
 

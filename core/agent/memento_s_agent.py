@@ -139,7 +139,12 @@ class MementoSAgent:
             session_manager=self.session_manager,
         )
         self.model = model
-        configure_builtin_tools(self.workspace, skill_library=_app_context.library)
+        configure_builtin_tools(
+            self.workspace,
+            skill_library=_app_context.library,
+            cloud_catalog=_app_context.cloud_catalog,
+            skill_manager=self.skill_manager,
+        )
 
     async def _llm_step(
         self,
@@ -275,15 +280,6 @@ class MementoSAgent:
 
         await self._preflight_discover(user_content, messages)
 
-        matched_skills_context = await asyncio.to_thread(
-            self.skill_manager.get_matched_skills_context, user_content, 5,
-        )
-        if matched_skills_context:
-            user_msg = messages[-1]
-            if isinstance(user_msg.get("content"), str):
-                user_msg["content"] = user_msg["content"] + "\n\n" + matched_skills_context
-            logger.info("Injected matched skills context into user message")
-
         final_content: str | None = None
         max_iter = g_settings.agent_max_iterations
         reminder_count = 0
@@ -417,15 +413,6 @@ class MementoSAgent:
             )
 
             await self._preflight_discover(user_content, messages)
-
-            matched_skills_context = await asyncio.to_thread(
-                self.skill_manager.get_matched_skills_context, user_content, 5,
-            )
-            if matched_skills_context:
-                user_msg = messages[-1]
-                if isinstance(user_msg.get("content"), str):
-                    user_msg["content"] = user_msg["content"] + "\n\n" + matched_skills_context
-                logger.info("Injected matched skills context into user message (stream)")
 
             final_content: str | None = None
             max_iter = g_settings.agent_max_iterations

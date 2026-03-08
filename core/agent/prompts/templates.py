@@ -98,27 +98,29 @@ You have the following built-in tools that are ALWAYS available:
 - **str_replace**: Edit files by replacing a unique string. The old string must appear exactly once.
 - **file_create**: Create new files with content. Parent directories are created automatically.
 - **view**: View files (with line numbers), directories (tree listing), or images (base64).
-- **read_skill**: Read a skill's SKILL.md documentation to understand how it works.
+- **route_skill**: Discover relevant skills for a sub-task. Returns a ranked list of matching skills (local and cloud). **Always call this first** when you need a skill — do NOT guess skill names.
+- **read_skill**: Read a skill's SKILL.md documentation. Call this after `route_skill` to learn how a chosen skill works. If the skill is from the cloud, it will be automatically downloaded.
 
 Prefer these core tools for basic file and command operations."""
 
 
 SKILLS_SECTION: Final[str] = """## Skill System
 
-Relevant skills are automatically suggested in user messages under a `[Matched Skills]` section.
+You have access to a library of local and cloud skills. Use the **route → read → execute** workflow:
 
-**When you see matched skills relevant to the task:**
-1. Use `read_skill` with the skill name to learn how it works.
-2. **If the skill has a `scripts/` directory**: run via `cd <skill_dir> && python3 scripts/<script>.py <args>`. Do NOT use `uv run python`.
-3. **If the skill is knowledge-only (no `scripts/` directory)**: read the SKILL.md and write your own inline code via `bash_tool` following its instructions. Do NOT attempt `from scripts.xxx import ...` — those files do not exist.
-4. NEVER guess import paths. Always `read_skill` first and follow the hint it provides.
+1. **Route**: Call `route_skill("your sub-task description")` to discover which skills can help.
+2. **Read**: Call `read_skill("skill-name")` on the skill you want to use. This loads the SKILL.md and, for cloud skills, downloads them automatically.
+3. **Execute**:
+   - **If the skill has a `scripts/` directory**: run via `cd <skill_dir> && python3 scripts/<script>.py <args>`. Do NOT use `uv run python`.
+   - **If the skill is knowledge-only (no `scripts/` directory)**: read the SKILL.md and write your own inline code via `bash_tool` following its instructions. Do NOT attempt `from scripts.xxx import ...` — those files do not exist.
+4. NEVER guess import paths or skill names. Always `route_skill` then `read_skill` first.
 
 **IMPORTANT — when to use skills:**
-If you are not certain about the answer, or the question involves specific people, organizations, current events, or facts you are not fully confident about, always use a matched skill (such as web-search) rather than guessing.
+If you are not certain about the answer, or the question involves specific people, organizations, current events, or facts you are not fully confident about, always route and use a skill (such as web-search) rather than guessing.
 
-**When no matched skills appear or none are relevant:**
+**When no matching skill exists:**
 If the task involves a repeatable workflow that would benefit from a reusable skill:
-1. Use `read_skill` with `skill-creator` to learn the skill creation workflow.
+1. Use `read_skill("skill-creator")` to learn the skill creation workflow.
 2. Follow the skill-creator guidance to create a new skill.
 3. Use the newly created skill to complete the current task.
 

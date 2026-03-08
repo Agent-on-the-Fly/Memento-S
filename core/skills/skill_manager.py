@@ -158,8 +158,6 @@ class SkillManager:
         for info in infos:
             name = info.name.strip()
             desc = (info.description or "").strip()
-            if desc and len(desc) > 200:
-                desc = desc[:197] + "..."
             entry = f"- {name}: {desc}" if desc else f"- {name}"
             lines.append(entry)
         lines.append("[/Matched Skills]")
