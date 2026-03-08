@@ -1,0 +1,73 @@
+{
+  "source_dir": "Memento-H/HLE_Evolve/cais/hle/data_jsonl/split_8_2_with_image_path",
+  "output_dir": "Memento-H/HLE_Evolve/cais/hle/data_jsonl/split_8_2_with_image_path/sampled_train100_test50_no_replace",
+  "seed": 42,
+  "sampling": "without_replacement",
+  "targets": {
+    "train_per_category": 100,
+    "test_per_category": 50
+  },
+  "categories": [
+    {
+      "file": "biology_medicine.jsonl",
+      "train_available": 224,
+      "train_sampled": 100,
+      "test_available": 56,
+      "test_sampled": 50
+    },
+    {
+      "file": "chemistry.jsonl",
+      "train_available": 132,
+      "train_sampled": 100,
+      "test_available": 33,
+      "test_sampled": 33
+    },
+    {
+      "file": "computer_science_ai.jsonl",
+      "train_available": 192,
+      "train_sampled": 100,
+      "test_available": 49,
+      "test_sampled": 49
+    },
+    {
+      "file": "engineering.jsonl",
+      "train_available": 88,
+      "train_sampled": 88,
+      "test_available": 23,
+      "test_sampled": 23
+    },
+    {
+      "file": "humanities_social_science.jsonl",
+      "train_available": 175,
+      "train_sampled": 100,
+      "test_available": 44,
+      "test_sampled": 44
+    },
+    {
+      "file": "math.jsonl",
+      "train_available": 816,
+      "train_sampled": 100,
+      "test_available": 205,
+      "test_sampled": 50
+    },
+    {
+      "file": "other.jsonl",
+      "train_available": 186,
+      "train_sampled": 100,
+      "test_available": 47,
+      "test_sampled": 47
+    },
+    {
+      "file": "physics.jsonl",
+      "train_available": 184,
+      "train_sampled": 100,
+      "test_available": 46,
+      "test_sampled": 46
+    }
+  ],
+  "num_categories": 8,
+  "train_total_sampled": 788,
+  "test_total_sampled": 342,
+  "requested_train_total_if_possible": 800,
+  "requested_test_total_if_possible": 400
+}

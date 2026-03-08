@@ -5,10 +5,6 @@
 .agent/
 runs/
 
-GAIA_data/
-
-eval_gaia.py
-gaia_eval.log
 
 __pycache__/
 *.py[cod]
@@ -67,6 +63,3 @@ scripts/
 router_data/.cloud_chroma/
 
 workspace/
-hle_data/
-gaia_data/
-core/evolve/

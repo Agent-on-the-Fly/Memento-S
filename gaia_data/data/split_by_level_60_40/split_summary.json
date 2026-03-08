@@ -1,0 +1,26 @@
+{
+  "ratio": 0.6,
+  "seed": 20260219,
+  "per_level": {
+    "level1": {
+      "total": 53,
+      "train": 32,
+      "test": 21
+    },
+    "level2": {
+      "total": 86,
+      "train": 52,
+      "test": 34
+    },
+    "level3": {
+      "total": 26,
+      "train": 16,
+      "test": 10
+    }
+  },
+  "merged": {
+    "train": 100,
+    "test": 65,
+    "overlap_count": 0
+  }
+}
