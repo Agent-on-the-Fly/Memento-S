@@ -1,0 +1,72 @@
+# Production dependencies for Memento-S
+# Install with: pip install -r requirements-prod.txt
+
+# CLI
+typer>=0.9.0
+rich>=13.0.0
+
+# Configuration & Validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# File watching
+watchdog>=3.0.0
+
+# LLM Providers
+anthropic>=0.40.0
+openai>=1.0.0
+litellm>=1.81.10
+
+# MCP Client
+mcp>=1.0.0
+
+# Web Search & Crawling
+google_search_results>=2.4.0
+pillow>=10.4.0
+crawl4ai>=0.4.0
+camel-ai>=0.2.0
+
+# YAML parsing (for skill validation)
+pyyaml>=6.0.0
+
+# HTTP clients
+httpx>=0.25.0
+aiohttp>=3.9.0
+requests>=2.31.0
+beautifulsoup4
+markdownify
+
+# Async support
+aiofiles>=23.0.0
+anyio>=4.0.0
+
+# Skill Retrieval
+jieba>=0.42.1
+rank-bm25>=0.2.0
+
+# Utils
+platformdirs>=4.0.0
+jsonschema>=4.20.0
+loguru>=0.7.0
+
+# Storage
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
+sqlite-vec>=0.1.0
+numpy>=1.24.0,<2.0.0
+alembic>=1.12.0
+
+# GUI
+flet>=0.25.0
+flet-cli>=0.25.0
+# flet-desktop>=0.25.0
+
+tiktoken>=0.4.0
+
+
+# IM Platform (Feishu)
+lark-oapi>=1.3.0
+
+# Build Tools
+pyinstaller>=6.0.0

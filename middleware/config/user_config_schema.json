@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "user_config_schema.json",
+  "title": "Memento-S User Configuration Schema",
+  "description": "User-facing configuration schema for Memento-S",
+  "type": "object",
+  "required": ["app", "llm", "env"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "app": {
+      "type": "object",
+      "required": ["theme", "language"],
+      "properties": {
+        "theme": { "type": "string" },
+        "language": { "type": "string" }
+      }
+    },
+    "llm": {
+      "type": "object",
+      "required": ["active_profile", "profiles"],
+      "properties": {
+        "active_profile": { "type": "string", "minLength": 1 },
+        "profiles": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/definitions/userLlmProfile" }
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "null"] }
+    }
+  },
+  "definitions": {
+    "providerApiKey": {
+      "type": "object",
+      "required": ["api_key"],
+      "properties": {
+        "api_key": { "type": ["string", "null"] }
+      }
+    },
+    "userLlmProfile": {
+      "type": "object",
+      "required": ["model", "api_key", "base_url"],
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "api_key": { "type": ["string", "null"] },
+        "base_url": { "type": "string", "minLength": 1 },
+        "extra_headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "extra_body": {
+          "type": "object"
+        },
+        "context_window": { "type": "integer", "minimum": 1024 },
+        "max_tokens": { "type": "integer", "minimum": 1 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "timeout": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

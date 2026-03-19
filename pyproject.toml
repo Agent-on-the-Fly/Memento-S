@@ -1,0 +1,141 @@
+[project]
+name = "memento-s"
+version = "0.1.0"
+description = "Memento-S Agent"
+requires-python = ">=3.12"
+dependencies = [
+    "typer",
+    "rich",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "watchdog",
+    "anthropic",
+    "openai",
+    "litellm>=1.81.10",
+    "mcp",
+    "tiktoken",
+    "httpx",
+    "beautifulsoup4",
+    "markdownify",
+    "aiohttp",
+    "requests",
+    "aiofiles",
+    "anyio",
+    "pyyaml",
+    "google_search_results",
+    "crawl4ai",
+    "camel-ai",
+    "nltk",
+    "jieba>=0.42.1",
+    "rank-bm25",
+    "flet>=0.25.0",
+    "platformdirs>=4.0.0",
+    "loguru>=0.7.0",
+    "sqlalchemy>=2.0.0",
+    "aiosqlite>=0.19.0",
+    "sqlite-vec>=0.1.0",
+    "alembic>=1.12.0",
+]
+
+
+[project.scripts]
+memento = "cli.main:memento_entry"
+memento-gui = "gui.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# ─── Flet build（原生 Flutter 应用，单进程单图标）──────────────────────────────
+[tool.flet]
+app.module_name     = "gui.app"
+app.name            = "memento-s"
+app.product         = "Memento-S"
+app.org             = "com.yangtzeailab.memento-s"
+app.bundle_id       = "com.yangtzeailab.memento-s.app"
+app.build_version   = "0.1.0"
+app.build_number    = 1
+
+[tool.flet.app.macos]
+# 高分辨率 + 网络/文件权限（Flet 本地服务需要）
+info_plist    = { NSHighResolutionCapable = true }
+entitlements  = { "com.apple.security.network.client" = true, "com.apple.security.network.server" = true, "com.apple.security.files.user-selected.read-write" = true }
+
+# ─── Briefcase packaging ───────────────────────────────────────────────────────
+[tool.briefcase]
+project_name = "Memento-S"
+bundle = "com.memento-s"
+version = "0.1.0"
+
+[tool.briefcase.app.memento-s]
+formal_name = "Memento-S"
+description = "Memento-S Agent"
+# Entry point: briefcase calls gui.app.main()
+main_module = "gui.app"
+# All source packages to copy into the bundle
+sources = [
+    "gui",
+    "core",
+    "middleware",
+    "cli",
+    "utils",
+    "builtin",
+    "daemon",
+    "bootstrap",   # bootstrap/ package (was bootstrap.py)
+]
+requires = [
+    "flet>=0.25.0",
+    "litellm>=1.81.10",
+    "anthropic",
+    "openai",
+    "typer",
+    "rich",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "watchdog",
+    "mcp",
+    "tiktoken",
+    "httpx",
+    "beautifulsoup4",
+    "markdownify",
+    "aiohttp",
+    "requests",
+    "aiofiles",
+    "anyio",
+    "pyyaml",
+    "platformdirs>=4.0.0",
+    "loguru>=0.7.0",
+    "sqlalchemy>=2.0.0",
+    "aiosqlite>=0.19.0",
+    "sqlite-vec>=0.1.0",
+    "alembic>=1.12.0",
+]
+
+[tool.briefcase.app.memento-s.windows]
+# Windows-specific: GUI app (no console window)
+console_app = false
+
+# ─── Hatch build ───────────────────────────────────────────────────────────────
+[tool.hatch.build.targets.wheel]
+packages = ["cli", "core", "middleware", "gui", "utils", "builtin", "daemon"]
+include = [
+    "bootstrap.py",
+    "builtin/skills/**",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "cli/",
+    "core/",
+    "middleware/",
+    "gui/",
+    "utils/",
+    "builtin/",
+    "daemon/",
+    "bootstrap.py",
+    "pyproject.toml",
+    "README.md",
+    "howto.md",
+]

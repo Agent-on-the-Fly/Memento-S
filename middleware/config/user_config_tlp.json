@@ -1,0 +1,37 @@
+{
+  "$schema": "./user_config_schema.json",
+  "app": {
+    "theme": "system",
+    "language": "zh-CN"
+  },
+  "llm": {
+    "active_profile": "default",
+    "profiles": {
+      "default": {
+        "model": "anthropic/claude-3.5-sonnet",
+        "api_key": "",
+        "base_url": "https://api.openrouter.ai/v1",
+        "extra_headers": {},
+        "extra_body": {
+          "chat_template_kwargs": {
+            "thinking": false
+          }
+        },
+        "max_tokens": 81920,
+        "temperature": 0.5,
+        "timeout": 120
+      }
+    }
+  },
+  "env": {
+    "GITHUB_TOKEN": null,
+    "UV_PYTHON_INSTALL_MIRROR": "https://gh-proxy.com/https://github.com/indygreg/python-build-standalone/releases/download",
+    "PIP_INDEX_URL": "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple",
+    "PIP_EXTRA_INDEX_URL": "https://mirrors.aliyun.com/pypi/simple/ https://mirrors.huaweicloud.com/repository/pypi/simple/",
+    "PIP_TRUSTED_HOST": "mirrors.tuna.tsinghua.edu.cn mirrors.aliyun.com mirrors.huaweicloud.com",
+    "UV_PIP_INDEX_URL": "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple",
+    "UV_PIP_EXTRA_INDEX_URL": "https://mirrors.aliyun.com/pypi/simple/ https://mirrors.huaweicloud.com/repository/pypi/simple/",
+    "UV_PIP_TRUSTED_HOST": "mirrors.tuna.tsinghua.edu.cn mirrors.aliyun.com mirrors.huaweicloud.com",
+    "TAVILY_API_KEY": ""
+  }
+}

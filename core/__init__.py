@@ -1,0 +1,1 @@
+# Memento-S Core Module

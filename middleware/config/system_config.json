@@ -1,0 +1,76 @@
+{
+  "version": "0.1.0",
+  "app": {
+    "name": "Memento-S",
+    "theme_options": {
+      "system": {
+        "zh-CN": "跟随系统",
+        "en-US": "System"
+      },
+      "light": {
+        "zh-CN": "亮色",
+        "en-US": "Light"
+      },
+      "dark": {
+        "zh-CN": "暗色",
+        "en-US": "Dark"
+      }
+    },
+    "language_options": {
+      "zh-CN": {
+        "zh-CN": "中文",
+        "en-US": "Chinese"
+      },
+      "en-US": {
+        "zh-CN": "Chinese",
+        "en-US": "English"
+      }
+    }
+  },
+  "skills": {
+    "catalog_path": "router_data/skills_catalog.jsonl",
+    "github_mirrors": [
+      "https://gh-proxy.com/"
+    ],
+    "cloud_catalog_url": "http://8.140.204.114:9001/",
+    "retrieval": {
+      "top_k": 5,
+      "min_score": 0.012,
+      "embedding_model": "Qwen3-Embedding-4B",
+      "embedding_base_url": "http://45.120.102.120:20002/v1",
+      "embedding_api_key": null,
+      "reranker_enabled": true,
+      "reranker_min_score": 0.001
+    },
+    "execution": {
+      "timeout_sec": 300,
+      "max_reflection_retries": 3,
+      "sandbox_provider": "uv",
+      "uv_python_version": "3.12",
+      "bash_timeout_sec": 300,
+      "pip_install_timeout_sec": 180,
+      "cli_install_timeout_sec": 300
+    },
+    "strategy": {
+      "resolve_strategy": "local_first",
+      "download_method": "auto"
+    }
+  },
+  "paths": {
+    "workspace_dir": null,
+    "skills_dir": null,
+    "db_dir": null,
+    "logs_dir": null,
+    "venv_dir": null,
+    "path_validation_enabled": false
+  },
+  "logging": {
+    "level": "INFO"
+  },
+  "agent": {
+    "max_iterations": 100
+  },
+  "ota": {
+    "url": "http://127.0.0.1:8000/api/v1/check_for_updates"
+  }
+}
