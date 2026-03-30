@@ -34,7 +34,15 @@ def bootstrap_sync() -> None:
         raise
 
     # ------------------------------------------------------------------
-    # 1b. Ensure runtime directories exist
+    # 1b. Initialize logger from config
+    # ------------------------------------------------------------------
+    from utils.logger import setup_logger
+
+    log_level = g_config.logging.level if g_config.logging else "INFO"
+    setup_logger(console_level=log_level, file_level=log_level)
+
+    # ------------------------------------------------------------------
+    # 1c. Ensure runtime directories exist
     # ------------------------------------------------------------------
     from utils.path_manager import PathManager
 

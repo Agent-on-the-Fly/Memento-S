@@ -112,10 +112,8 @@ def setup_logger(
             enable_console=False
         )
     """
-    # Check if already initialized
     global _logger_initialized
-    if _logger_initialized:
-        # Logger already set up, skip re-initialization
+    if _logger_initialized and not clear_existing:
         return
 
     # 1. 清除 loguru 默认配置
