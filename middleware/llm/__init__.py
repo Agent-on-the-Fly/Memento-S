@@ -7,10 +7,21 @@ middleware.llm — 统一 LLM 调用层
 - 超时控制
 - 熔断保护
 - 流式/非流式调用
+- Embedding API
 """
 
-from .client import LLMClient
-from .schema import LLMResponse, LLMStreamChunk, ToolCall, ContentBlock
+from .llm_client import LLMClient, RawTokenConfig, chat_completions, chat_completions_async
+from .embedding_client import EmbeddingClient, EmbeddingClientConfig
+from .schema import (
+    FINISH_CONTENT_FILTER,
+    FINISH_LENGTH,
+    FINISH_STOP,
+    FINISH_TOOL_CALLS,
+    LLMResponse,
+    LLMStreamChunk,
+    ToolCall,
+    ContentBlock,
+)
 from .exceptions import (
     LLMException,
     LLMTimeoutError,
@@ -19,7 +30,16 @@ from .exceptions import (
 )
 
 __all__ = [
+    "FINISH_CONTENT_FILTER",
+    "FINISH_LENGTH",
+    "FINISH_STOP",
+    "FINISH_TOOL_CALLS",
     "LLMClient",
+    "RawTokenConfig",
+    "chat_completions",
+    "chat_completions_async",
+    "EmbeddingClient",
+    "EmbeddingClientConfig",
     "LLMResponse",
     "LLMStreamChunk",
     "ToolCall",

@@ -16,17 +16,11 @@ from .file_ops import (
     edit_file_by_lines_tool,
 )
 from .grep import grep_tool
+from .python_repl import python_repl_tool
 from .web import fetch_webpage_tool, tavily_search_tool
 
 logger = logging.getLogger(__name__)
 
-
-def get_tool_schema(tool_name: str) -> dict | None:
-    """根据 tool name 获取其参数 schema。"""
-    for schema in BUILTIN_TOOL_SCHEMAS:
-        if schema["function"]["name"] == tool_name:
-            return schema["function"]["parameters"]
-    return None
 
 # --- Tool Registry (name -> handler) ---
 
@@ -38,6 +32,7 @@ BUILTIN_TOOL_REGISTRY = {
     "grep": grep_tool,
     "list_dir": list_dir_tool,
     "read_file": read_file_tool,
+    "python_repl": python_repl_tool,
     "search_web": tavily_search_tool,
 }
 
@@ -60,10 +55,6 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "integer",
                         "description": "Maximum recursion depth (default 2).",
                         "default": 2,
-                    },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Optional base directory for path resolution.",
                     },
                 },
                 "required": [],
@@ -91,10 +82,6 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "integer",
                         "description": "Line number to stop reading (inclusive). Use -1 to read to the end.",
                         "default": -1,
-                    },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Optional base directory for path resolution.",
                     },
                 },
                 "required": ["path"],
@@ -131,10 +118,6 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "boolean",
                         "description": "Whether to show line numbers in results (default True). Only applies when searching text.",
                         "default": True,
-                    },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Optional base directory for path resolution.",
                     },
                 },
                 "required": ["pattern"],
@@ -184,7 +167,7 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "boolean",
                         "description": "Include raw page content when available.",
                         "default": False,
-                    }
+                    },
                 },
                 "required": ["query"],
             },
@@ -194,22 +177,23 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "file_create",
-            "description": "Create a new file. Provide a valid file path; do NOT pass file content in the path field.",
+            "description": "Create or overwrite a file. Set overwrite=true to replace an existing file.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Path to the new file.",
+                        "description": "Path to the file.",
                     },
                     "content": {
                         "type": "string",
-                        "description": "The initial content to write into the file.",
+                        "description": "The content to write into the file.",
                         "default": "",
                     },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Optional base directory for path resolution.",
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": "If true, overwrite existing file. Default false.",
+                        "default": False,
                     },
                 },
                 "required": ["path"],
@@ -240,10 +224,6 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "string",
                         "description": "The exact new text to put in place of the replaced lines.",
                     },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Optional base directory for path resolution.",
-                    },
                 },
                 "required": ["path", "start_line", "end_line", "new_content"],
             },
@@ -265,20 +245,44 @@ BUILTIN_TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "type": "string",
                         "description": "Optional standard input passed to the command.",
                     },
-                    "base_dir": {
-                        "type": "string",
-                        "description": "Optional base directory for path resolution (security boundary).",
-                    },
-                    "work_dir": {
-                        "type": "string",
-                        "description": "Optional working directory for command execution.",
-                    },
                 },
                 "required": ["command"],
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "python_repl",
+            "description": "Execute Python code using the UV sandbox.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Python code to execute.",
+                    },
+                    "skill_name": {
+                        "type": "string",
+                        "description": "Name of the skill owning this execution.",
+                    },
+                    "deps": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional Python dependencies to install.",
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Optional session identifier for sandbox paths.",
+                        "default": "",
+                    },
+                },
+                "required": ["code", "skill_name"],
+            },
+        },
+    },
 ]
+
 
 def is_builtin_tool(name: str) -> bool:
     """Return True if name is a built-in tool."""
@@ -296,16 +300,23 @@ def get_tools_summary() -> str:
     return "\n".join(lines)
 
 
+def get_tool_schema(tool_name: str) -> dict | None:
+    """根据 tool name 获取其参数 schema。"""
+    for schema in BUILTIN_TOOL_SCHEMAS:
+        if schema["function"]["name"] == tool_name:
+            return schema["function"]["parameters"]
+    return None
+
+
 async def execute_builtin_tool(
     name: str,
     arguments: dict[str, Any],
-    *,
-    base_dir: Path | None = None,
 ) -> str:
-    """Execute a built-in tool by name with the given arguments."""
+    """Execute a built-in tool by name with the given arguments.
+
+    Note: Paths in arguments are pre-resolved to absolute paths by ToolContext.
+    """
     arguments.pop("description", None)
-    if base_dir is not None and "base_dir" not in arguments:
-        arguments["base_dir"] = str(base_dir)
 
     fn = BUILTIN_TOOL_REGISTRY.get(name)
     if fn is None:

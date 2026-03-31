@@ -1,0 +1,21 @@
+# Development dependencies for Memento-S
+# Install with: pip install -r requirements-dev.txt
+
+# Include all production dependencies
+-r requirements-prod.txt
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+
+# Linting & Formatting
+ruff>=0.1.0
+black>=23.0.0
+mypy>=1.0.0
+
+# Pre-commit hooks
+pre-commit>=3.0.0
+
+# Development tools
+ipython>=8.0.0

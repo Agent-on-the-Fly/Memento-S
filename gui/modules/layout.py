@@ -5,9 +5,11 @@ import asyncio
 import flet as ft
 
 from middleware.config import g_config
+from middleware.llm.llm_client import reload_llm_config
 from gui.i18n import t
 from gui.widgets.sidebar import SessionSidebar
 from gui.widgets.toolbar import Toolbar
+from gui.widgets.user_info_bar import UserInfoBar
 
 
 class AppLayoutBuilder:
@@ -56,7 +58,7 @@ class AppLayoutBuilder:
             self.app.page.update()
 
     def create_sidebar(self):
-        self.app.sidebar = SessionSidebar(
+        self.app.session_sidebar = SessionSidebar(
             on_new_chat=self.app._on_new_chat,
             on_select_session=lambda sid: asyncio.create_task(
                 self.app._on_select_session(sid)
@@ -70,9 +72,31 @@ class AppLayoutBuilder:
             on_load_more=lambda: asyncio.create_task(self.app._on_load_more_sessions()),
         )
 
+        # 侧边栏底部：现代化的紧凑工具栏（包含 Settings、Market 和 User）
+        self.app.sidebar_bottom_bar = self._build_sidebar_bottom_bar()
+
+        # UserInfoBar 保留但不显示在侧边栏（用于 app.py 的状态管理）
+        self.app.user_info_bar = UserInfoBar(
+            on_login_click=self.app._on_login_click,
+            on_logout_click=self.app._on_logout_click,
+        )
+
+        self.app.sidebar = ft.Container(
+            content=ft.Column(
+                [
+                    self.app.session_sidebar,
+                    self.app.sidebar_bottom_bar,
+                ],
+                spacing=0,
+                expand=True,
+            ),
+            width=196,
+            bgcolor=ft.Colors.GREY_900,
+            border=ft.Border(right=ft.BorderSide(1, ft.Colors.GREY_800)),
+        )
+
     def create_main_area(self):
         self.app.toolbar = Toolbar(
-            on_settings=self.app._show_settings,
             on_clear=self.app._on_clear_chat,
             on_export=self.app._on_export_chat,
         )
@@ -126,6 +150,7 @@ class AppLayoutBuilder:
             icon_color=ft.Colors.BLUE_400,
             on_click=lambda e: asyncio.create_task(self.app._on_send_message(e)),
             tooltip=t("input.send"),
+            mouse_cursor=ft.MouseCursor.CLICK,
         )
 
         self.app.stop_button = ft.IconButton(
@@ -134,6 +159,7 @@ class AppLayoutBuilder:
             on_click=lambda e: self.app._on_stop_generation(e),
             tooltip=t("input.stop"),
             visible=False,
+            mouse_cursor=ft.MouseCursor.CLICK,
         )
 
         input_with_buttons = ft.Container(
@@ -207,9 +233,6 @@ class AppLayoutBuilder:
             bgcolor=ft.Colors.GREY_800,
         )
 
-        # 加载模型配置
-        self._load_model_config()
-
         # 创建模型选择下拉菜单
         self.app.model_selector = self._build_model_selector()
 
@@ -254,7 +277,7 @@ class AppLayoutBuilder:
                 ],
                 spacing=12,
             ),
-            padding=ft.Padding.symmetric(horizontal=20, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=20, vertical=4),
             bgcolor=ft.Colors.GREY_900,
             border=ft.Border.only(top=ft.BorderSide(1, ft.Colors.GREY_800)),
         )
@@ -277,11 +300,15 @@ class AppLayoutBuilder:
                 g_config.load()
 
             if g_config and g_config.llm:
+                profiles_keys = list(g_config.llm.profiles.keys())
                 self.current_profile = g_config.llm.active_profile
-                self.available_profiles = list(g_config.llm.profiles.keys())
+                self.available_profiles = profiles_keys
                 current_model = g_config.llm.current
                 self.current_model_name = (
                     current_model.model if current_model else self.current_profile
+                )
+                print(
+                    f"[_load_model_config] Loaded profiles: {profiles_keys}, active: {self.current_profile}"
                 )
             else:
                 self.current_profile = "default"
@@ -309,7 +336,7 @@ class AppLayoutBuilder:
 
         # 搜索框
         self.search_field = ft.TextField(
-            hint_text="搜索模型...",
+            hint_text=t("toolbar.search_models"),
             hint_style=ft.TextStyle(size=11, color=ft.Colors.GREY_500),
             text_style=ft.TextStyle(size=11, color=ft.Colors.WHITE),
             border_color=ft.Colors.GREY_700,
@@ -325,7 +352,7 @@ class AppLayoutBuilder:
             icon=ft.icons.Icons.ADD,
             icon_size=19,
             icon_color=ft.Colors.GREEN_400,
-            tooltip="添加模型",
+            tooltip=t("toolbar.add_model"),
             on_click=lambda e: self._on_add_model_click(),
             style=ft.ButtonStyle(
                 padding=ft.Padding(left=2, right=2, top=2, bottom=2),
@@ -337,7 +364,7 @@ class AppLayoutBuilder:
             icon=ft.icons.Icons.EDIT,
             icon_size=18,
             icon_color=ft.Colors.BLUE_400,
-            tooltip="编辑模型",
+            tooltip=t("toolbar.edit_model"),
             on_click=lambda e: self._on_edit_model_click(),
             style=ft.ButtonStyle(
                 padding=ft.Padding(left=2, right=2, top=2, bottom=2),
@@ -547,7 +574,7 @@ class AppLayoutBuilder:
             top = self._dropdown_position[1] - dropdown_height - 5  # 正上方，5px 间距
         else:
             # 默认位置
-            left = 180
+            left = 100
             top = page_height - dropdown_height - 80
 
         # 确保不超出屏幕边界
@@ -646,7 +673,7 @@ class AppLayoutBuilder:
                     icon=ft.icons.Icons.DELETE_OUTLINE,
                     icon_size=16,
                     icon_color=ft.Colors.RED_400,
-                    tooltip="删除模型",
+                    tooltip=t("toolbar.delete_model_tooltip"),
                     on_click=lambda e, name=profile_name: self._on_delete_model_click(
                         name
                     ),
@@ -673,7 +700,7 @@ class AppLayoutBuilder:
             model_items.append(
                 ft.Container(
                     content=ft.Text(
-                        "未找到匹配的模型",
+                        t("toolbar.no_matching_models"),
                         size=11,
                         color=ft.Colors.GREY_500,
                     ),
@@ -683,7 +710,14 @@ class AppLayoutBuilder:
 
         self.model_list_column.controls = model_items
         print(f"[_update_model_list] set {len(model_items)} items to column")
-        # 刷新页面以显示新内容
+        # 刷新下拉菜单以显示新内容（如果已添加到页面）
+        try:
+            if hasattr(self, "dropdown_menu") and self.dropdown_menu.page:
+                self.dropdown_menu.update()
+        except RuntimeError:
+            # 控件未添加到页面，跳过
+            pass
+        # 刷新页面
         if self.app.page:
             print(f"[_update_model_list] calling page.update()")
             self.app.page.update()
@@ -712,6 +746,12 @@ class AppLayoutBuilder:
             )
             self._refresh_bottom_info_bar()
             print(f"[Layout] _refresh_bottom_info_bar completed")
+            self._update_model_list()
+            print(f"[Layout] _update_model_list completed")
+            # 重新初始化LLM客户端，使新配置立即生效
+            if hasattr(self.app, "_on_settings_saved"):
+                self.app._on_settings_saved()
+                print(f"[Layout] LLM client reinitialized")
 
         settings_panel = SettingsPanel(
             page=self.app.page,
@@ -734,10 +774,10 @@ class AppLayoutBuilder:
         if hasattr(self, "edit_btn"):
             if self._is_editing_models:
                 self.edit_btn.icon = ft.icons.Icons.CHECK
-                self.edit_btn.tooltip = "完成编辑"
+                self.edit_btn.tooltip = t("toolbar.finish_editing")
             else:
                 self.edit_btn.icon = ft.icons.Icons.EDIT
-                self.edit_btn.tooltip = "编辑模型"
+                self.edit_btn.tooltip = t("toolbar.edit_model")
             self.edit_btn.update()
 
         # 刷新列表显示编辑状态
@@ -759,12 +799,12 @@ class AppLayoutBuilder:
             self.app.page.update()
 
         dialog = ft.AlertDialog(
-            title=ft.Text("确认删除"),
-            content=ft.Text(f"确定要删除模型 '{profile_name}' 吗？\n此操作不可撤销。"),
+            title=ft.Text(t("dialogs.delete_model_title")),
+            content=ft.Text(t("dialogs.delete_model_msg", name=profile_name)),
             actions=[
-                ft.TextButton("取消", on_click=cancel_delete),
+                ft.TextButton(t("dialogs.cancel"), on_click=cancel_delete),
                 ft.TextButton(
-                    "删除",
+                    t("dialogs.confirm"),
                     on_click=confirm_delete,
                     style=ft.ButtonStyle(color=ft.Colors.RED_400),
                 ),
@@ -785,7 +825,7 @@ class AppLayoutBuilder:
             if len(self.available_profiles) <= 1:
                 print(f"[Layout] Cannot delete last profile")
                 if hasattr(self.app, "_show_snackbar"):
-                    self.app._show_snackbar("不能删除最后一个模型")
+                    self.app._show_snackbar(t("toolbar.cannot_delete_last_model"))
                 return
 
             # 从配置中删除
@@ -802,29 +842,69 @@ class AppLayoutBuilder:
                         else:
                             profiles[name] = dict(profile)
 
-                # 如果删除的是当前选中模型，先切换 active_profile
+                # 准备 llm 配置更新（原子性更新，避免中间状态验证失败）
+                # 确定新的 active_profile
                 if profile_name == self.current_profile:
                     remaining_profiles = list(profiles.keys())
-                    if remaining_profiles:
-                        new_profile = remaining_profiles[0]
-                        print(f"[Layout] Switching to new profile: {new_profile}")
-                        # 先更新 active_profile，避免验证失败
-                        g_config.set("llm.active_profile", new_profile, save=False)
+                    new_active_profile = (
+                        remaining_profiles[0] if remaining_profiles else None
+                    )
+                    if new_active_profile:
+                        print(
+                            f"[Layout] Switching to new profile: {new_active_profile}"
+                        )
+                else:
+                    # 保留现有的 active_profile
+                    new_active_profile = g_config.llm.active_profile
 
-                # 再删除 profile 并保存
-                g_config.set("llm.profiles", profiles, save=True)
+                # 原子性更新 llm 配置（必须同时包含 active_profile 和 profiles）
+                llm_update = {
+                    "active_profile": new_active_profile,
+                    "profiles": profiles,
+                }
+                g_config.set("llm", llm_update, save=True)
+
+                # 刷新 LLM 客户端配置，确保后续请求使用新配置
+                reload_llm_config()
+
+                # 刷新 MementoSAgent 的 LLM 配置（如果存在）
+                if hasattr(self.app, "_agent") and self.app._agent:
+                    self.app._agent.reload_llm_config()
+
+                # 判断是否需要刷新底部状态栏（在 _load_model_config 之前保存状态）
+                need_refresh_bottom = profile_name == self.current_profile
+
+                # 打印删除后的 g_config 状态
+                print(
+                    f"[_delete_profile] After delete, g_config profiles: {list(g_config.llm.profiles.keys())}"
+                )
 
                 # 刷新配置和 UI
                 self._load_model_config()
-                if profile_name == self.current_profile:
+                if need_refresh_bottom:
                     self._refresh_bottom_info_bar()
+
+                # 退出编辑模式（删除完成后）
+                if self._is_editing_models:
+                    self._is_editing_models = False
+                    # 更新编辑按钮图标
+                    if hasattr(self, "edit_btn"):
+                        self.edit_btn.icon = ft.icons.Icons.EDIT
+                        self.edit_btn.tooltip = "编辑模型"
 
                 # 刷新列表
                 self._update_model_list()
 
+                # 如果下拉菜单正在显示，关闭它
+                # 因为 overlay 中的控件不会自动检测子控件的变化
+                if self._overlay_entry and self._overlay_entry in self.app.page.overlay:
+                    self._hide_dropdown()
+
                 # 显示提示
                 if hasattr(self.app, "_show_snackbar"):
-                    self.app._show_snackbar(f"模型 '{profile_name}' 已删除")
+                    self.app._show_snackbar(
+                        t("toolbar.model_deleted", name=profile_name)
+                    )
 
                 print(f"[Layout] Profile deleted successfully")
             else:
@@ -836,7 +916,7 @@ class AppLayoutBuilder:
 
             traceback.print_exc()
             if hasattr(self.app, "_show_error"):
-                self.app._show_error(f"删除模型失败: {e}")
+                self.app._show_error(t("toolbar.delete_model_failed", error=e))
 
     def _refresh_bottom_info_bar(self):
         """刷新底部状态栏的模型选择器显示"""
@@ -910,7 +990,7 @@ class AppLayoutBuilder:
                 ],
                 spacing=12,
             ),
-            padding=ft.Padding.symmetric(horizontal=20, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=20, vertical=4),
             bgcolor=ft.Colors.GREY_900,
             border=ft.Border.only(top=ft.BorderSide(1, ft.Colors.GREY_800)),
             clip_behavior=ft.ClipBehavior.NONE,  # 不裁剪子控件
@@ -920,3 +1000,85 @@ class AppLayoutBuilder:
         """刷新模型选择器（当配置发生变化时调用）"""
         self._load_model_config()
         self._refresh_bottom_info_bar()
+
+    def _build_sidebar_bottom_bar(self):
+        """构建侧边栏底部现代化工具栏"""
+        # Settings 按钮 - 简洁图标样式
+        self._settings_btn = ft.IconButton(
+            icon=ft.icons.Icons.SETTINGS_OUTLINED,
+            icon_size=18,
+            icon_color=ft.Colors.GREY_500,
+            tooltip=t("toolbar.tooltip.settings"),
+            on_click=lambda e: self.app._show_settings(),
+            style=ft.ButtonStyle(
+                padding=ft.Padding(6, 6, 6, 6),
+                shape=ft.RoundedRectangleBorder(radius=4),
+                overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            ),
+        )
+
+        # Market 按钮 - 简洁图标样式
+        self._market_btn = ft.IconButton(
+            icon=ft.icons.Icons.SHOPPING_CART_OUTLINED,
+            icon_size=18,
+            icon_color=ft.Colors.GREY_500,
+            tooltip="Market",
+            on_click=lambda e: self.app._on_markket(),
+            style=ft.ButtonStyle(
+                padding=ft.Padding(6, 6, 6, 6),
+                shape=ft.RoundedRectangleBorder(radius=4),
+                overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            ),
+        )
+
+        # 用户登录按钮
+        self._user_btn = ft.IconButton(
+            icon=ft.icons.Icons.ACCOUNT_CIRCLE_OUTLINED,
+            icon_size=20,
+            icon_color=ft.Colors.GREY_500,
+            tooltip=t("auth.click_to_login"),
+            on_click=lambda e: self.app._on_login_click(),
+            style=ft.ButtonStyle(
+                padding=ft.Padding(6, 6, 6, 6),
+                shape=ft.RoundedRectangleBorder(radius=4),
+                overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE),
+            ),
+        )
+
+        return ft.Container(
+            content=ft.Row(
+                [
+                    self._settings_btn,
+                    self._market_btn,
+                    ft.Container(expand=True),  # 弹性空间
+                    self._user_btn,
+                ],
+                spacing=4,
+                alignment=ft.MainAxisAlignment.START,
+            ),
+            padding=ft.Padding.symmetric(horizontal=8, vertical=6),
+            border=ft.Border(top=ft.BorderSide(1, ft.Colors.GREY_800)),
+        )
+
+    def update_sidebar_user_state(
+        self, logged_in: bool = False, display_name: str = ""
+    ):
+        """更新侧边栏底部用户按钮状态"""
+        if hasattr(self, "_user_btn") and self._user_btn:
+            if logged_in and display_name:
+                self._user_btn.icon = ft.icons.Icons.ACCOUNT_CIRCLE
+                self._user_btn.icon_color = ft.Colors.BLUE_400
+                self._user_btn.tooltip = display_name
+                # 点击已登录用户登出
+                self._user_btn.on_click = lambda e: self.app._on_logout_click()
+            else:
+                self._user_btn.icon = ft.icons.Icons.ACCOUNT_CIRCLE_OUTLINED
+                self._user_btn.icon_color = ft.Colors.GREY_500
+                self._user_btn.tooltip = t("auth.click_to_login")
+                self._user_btn.on_click = lambda e: self.app._on_login_click()
+
+            try:
+                if self._user_btn.page:
+                    self._user_btn.update()
+            except RuntimeError:
+                pass

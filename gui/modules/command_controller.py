@@ -1,20 +1,10 @@
 from __future__ import annotations
+import asyncio
 from gui.i18n import t
 import sys
 from pathlib import Path
 
 from middleware.config import g_config
-
-# 将飞书脚本目录加入 sys.path，供 /feishu 命令使用
-_FEISHU_SCRIPTS = (
-    Path(__file__).resolve().parents[2]
-    / "builtin"
-    / "skills"
-    / "im-platform"
-    / "scripts"
-)
-if str(_FEISHU_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_FEISHU_SCRIPTS))
 
 
 class CommandController:
@@ -22,8 +12,7 @@ class CommandController:
 
     def __init__(self, app):
         self.app = app
-        self._feishu_receiver = None  # FeishuReceiver 实例（运行中时不为 None）
-        self._feishu_loop = None  # bridge 后台线程的 asyncio event loop
+        self._feishu_bridge = None  # FeishuBridge 实例（运行中时不为 None）
 
     async def handle_command(self, cmd: str):
         parts = cmd.split(maxsplit=1)
@@ -44,7 +33,7 @@ class CommandController:
 • {t("context.tokens", current=self.app.total_tokens)}
 • {t("context.messages", count=len(self.app.messages))}
 • {t("context.model", model=model_name)}
-• {t("context.skills", count=len(self.app._skill_gateway.discover()) if self.app._skill_gateway else 0)}
+• {t("context.skills", count=len(await self.app._skill_gateway.discover()) if self.app._skill_gateway else 0)}
 • {t("context.session", id=self.app.current_session_id or "None")}"""
             self.app._add_system_message(info)
 
@@ -54,9 +43,11 @@ class CommandController:
                 self.app._add_system_message(t("context.compressing"))
                 self.app.page.update()
                 try:
-                    old_tokens, new_tokens, preview = (
-                        await agent.context_manager.force_compact_now()
-                    )
+                    (
+                        old_tokens,
+                        new_tokens,
+                        preview,
+                    ) = await agent.context_manager.force_compact_now()
                     if old_tokens == 0:
                         self.app._add_system_message(
                             t("commands.feedback.compress_no_history")
@@ -77,9 +68,7 @@ class CommandController:
                         t("context.compress_failed") + f": {e}"
                     )
             else:
-                self.app._add_system_message(
-                    t("commands.feedback.compress_no_session")
-                )
+                self.app._add_system_message(t("commands.feedback.compress_no_session"))
 
         elif base_cmd == "/reset":
             self.app.messages.clear()
@@ -90,7 +79,7 @@ class CommandController:
 
         elif base_cmd == "/skills":
             if self.app._skill_gateway:
-                manifests = self.app._skill_gateway.discover()
+                manifests = await self.app._skill_gateway.discover()
                 skills = [m.name for m in manifests]
                 skills_text = f"**{t('commands.help_title')} ({len(skills)})**\n\n"
                 skills_text += "\n".join(f"• {s}" for s in skills[:30])
@@ -202,67 +191,40 @@ class CommandController:
         import bootstrap as _bs
 
         if sub == "start":
-            if self._feishu_receiver is not None or _bs._feishu_bridge_started:
+            if self._feishu_bridge is not None or _bs._feishu_bridge_started:
                 self.app._add_system_message("飞书长链接已在运行中，无需重复启动")
                 return
             try:
-                import threading
-                import asyncio as _asyncio
-                import cli.commands.feishu_bridge as _fb
-                from core.memento_s.agent import MementoSAgent
+                from im.feishu import start_feishu_bridge_background, get_feishu_bridge
 
-                _fb._sender_sessions = _fb._load_mapping()
-                agent = MementoSAgent()
-
-                _loop_ref: list = [None]
-                _ready = threading.Event()
-
-                async def _tracked_bridge(a: MementoSAgent) -> None:
-                    _loop_ref[0] = _asyncio.get_running_loop()
-                    _ready.set()
-                    await _fb._bridge_main(a)
-
-                def _run() -> None:
-                    _asyncio.run(_tracked_bridge(agent))
-
-                t = threading.Thread(target=_run, daemon=True, name="feishu-bridge-gui")
-                t.start()
-                _ready.wait(timeout=5)
-                self._feishu_loop = _loop_ref[0]
+                # 使用顶层 im 模块启动
+                self._feishu_bridge = start_feishu_bridge_background()
                 _bs._feishu_bridge_started = True
                 self.app._add_system_message("✓ 飞书长链接已启动，等待消息中...")
             except Exception as e:
                 self.app._add_system_message(f"启动飞书长链接失败：{e}")
 
         elif sub == "stop":
-            if self._feishu_receiver is None and not _bs._feishu_bridge_started:
+            if self._feishu_bridge is None and not _bs._feishu_bridge_started:
                 self.app._add_system_message("飞书长链接当前未运行")
                 return
-            import cli.commands.feishu_bridge as _fb
 
-            # 1. 停止 lark WS receiver（断开连接，禁止重连）
-            recv = _fb._active_receiver or self._feishu_receiver
-            if recv is not None:
-                try:
-                    recv.stop()
-                except Exception:
-                    pass
-                _fb._active_receiver = None
-                self._feishu_receiver = None
-            # 2. 停掉 bridge 的 asyncio event loop，让线程退出
-            loop = self._feishu_loop or _fb._bridge_loop
-            if loop is not None:
-                try:
-                    loop.call_soon_threadsafe(loop.stop)
-                except Exception:
-                    pass
-                self._feishu_loop = None
-                _fb._bridge_loop = None
-            _bs._feishu_bridge_started = False
-            self.app._add_system_message("✓ 飞书长链接已停止")
+            try:
+                from im.feishu import stop_feishu_bridge, get_feishu_bridge
+
+                # 停止桥接
+                await stop_feishu_bridge()
+                self._feishu_bridge = None
+                _bs._feishu_bridge_started = False
+                self.app._add_system_message("✓ 飞书长链接已停止")
+            except Exception as e:
+                self.app._add_system_message(f"停止飞书长链接失败：{e}")
 
         elif sub == "status":
-            running = self._feishu_receiver is not None or _bs._feishu_bridge_started
+            from im.feishu import get_feishu_bridge
+
+            bridge = get_feishu_bridge()
+            running = bridge is not None and bridge.is_running or _bs._feishu_bridge_started
             if running:
                 src = (
                     "由启动项自动建立"

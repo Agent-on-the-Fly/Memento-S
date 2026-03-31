@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from middleware.llm.utils import chat_completions_async
+from middleware.llm.llm_client import chat_completions_async
 from .scratchpad import Scratchpad
 
 logger = get_logger(__name__)

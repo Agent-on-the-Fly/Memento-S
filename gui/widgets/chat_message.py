@@ -89,6 +89,7 @@ class ChatMessage(ft.Container):
         max_width: Optional[int] = None,
         steps: Optional[int] = None,
         duration_seconds: Optional[float] = None,
+        model_name: Optional[str] = None,
     ):
         super().__init__()
         self.text = text
@@ -98,6 +99,7 @@ class ChatMessage(ft.Container):
         self.show_avatar = show_avatar
         self.steps = steps
         self.duration_seconds = duration_seconds
+        self.model_name = model_name
 
         # Parse content
         content_controls = self._parse_content(text)
@@ -154,35 +156,43 @@ class ChatMessage(ft.Container):
         )
 
         # Metadata row with timestamp, steps, and duration (for assistant messages)
-        metadata_controls = [
-            ft.Text(
-                _format_timestamp(self.timestamp),
-                size=10,
-                color=ft.Colors.GREY_500,
-            )
-        ]
+        # Format: ModelName-HH:MM (X步, Ys) for assistant, or HH:MM (X步, Ys)
+        meta_parts = []
+
+        # Add model name for assistant messages
+        if not is_user and self.model_name:
+            meta_parts.append(self.model_name)
+
+        # Add timestamp
+        meta_parts.append(_format_timestamp(self.timestamp))
 
         # Add steps and duration for assistant messages
         if not is_user and (
             self.steps is not None or self.duration_seconds is not None
         ):
-            meta_parts = []
+            detail_parts = []
             if self.steps is not None:
-                meta_parts.append(f"{self.steps}步")
+                detail_parts.append(f"{self.steps}步")
             if self.duration_seconds is not None:
                 if self.duration_seconds < 1:
-                    meta_parts.append(f"{self.duration_seconds * 1000:.0f}ms")
+                    detail_parts.append(f"{self.duration_seconds * 1000:.0f}ms")
                 else:
-                    meta_parts.append(f"{self.duration_seconds:.1f}s")
+                    detail_parts.append(f"{self.duration_seconds:.1f}s")
 
-            if meta_parts:
-                metadata_controls.append(
-                    ft.Text(
-                        f" ({', '.join(meta_parts)})",
-                        size=10,
-                        color=ft.Colors.GREY_600,
-                    )
-                )
+            if detail_parts:
+                meta_parts.append(f"({', '.join(detail_parts)})")
+
+        metadata_controls = [
+            ft.Text(
+                "-".join(meta_parts)
+                if len(meta_parts) > 1
+                else meta_parts[0]
+                if meta_parts
+                else "",
+                size=10,
+                color=ft.Colors.GREY_500,
+            )
+        ]
 
         metadata_row = ft.Row(
             metadata_controls,

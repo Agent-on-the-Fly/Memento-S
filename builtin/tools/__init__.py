@@ -10,6 +10,7 @@ from .file_ops import (
     list_dir_tool,
 )
 from .grep import grep_tool
+from .python_repl import python_repl_tool
 from .web import fetch_webpage_tool, tavily_search_tool
 from .registry import (
     is_builtin_tool,
@@ -26,6 +27,7 @@ __all__ = [
     "read_file_tool",
     "list_dir_tool",
     "grep_tool",
+    "python_repl_tool",
     "fetch_webpage_tool",
     "tavily_search_tool",
     # Registry

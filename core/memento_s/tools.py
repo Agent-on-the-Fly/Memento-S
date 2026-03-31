@@ -10,17 +10,23 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any
+from difflib import get_close_matches
+from typing import Any, Callable
 
 from core.skill.gateway import SkillGateway
+from core.skill.schema import DiscoverStrategy
+from middleware.config import g_config
 from utils.debug_logger import log_tool_start, log_tool_end
-
-from .policies import PolicyManager
 
 logger = logging.getLogger(__name__)
 
+SkillsChangedCallback = Callable[[], None]
+
 TOOL_SEARCH_SKILL = "search_skill"
 TOOL_EXECUTE_SKILL = "execute_skill"
+TOOL_DOWNLOAD_SKILL = "download_skill"
+TOOL_CREATE_SKILL = "create_skill"
+TOOL_ASK_USER = "ask_user"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -32,7 +38,7 @@ SKILL_SEARCH_EXECUTE_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": TOOL_SEARCH_SKILL,
-            "description": "Search relevant skills by natural language query, then choose one skill_name for execute_skill.",
+            "description": "Search for relevant skills by natural language query across BOTH local installed skills and the remote skill server. Use this first when you don't know which skill to use.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -54,26 +60,81 @@ SKILL_SEARCH_EXECUTE_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": TOOL_EXECUTE_SKILL,
-            "description": "Execute one selected skill with skill-specific parameters. Each skill declares its own parameter schema in its manifest. Parameters are passed via the 'args' object. Common pattern: use 'request' field in args for natural language descriptions, or skill-specific fields like 'path', 'operation', etc.",
+            "description": "Execute a LOCAL installed skill. MUST NOT be used to execute remote or non-existent skills.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "skill_name": {
                         "type": "string",
-                        "description": "Exact skill name to execute.",
+                        "description": "Exact logic name of the skill to execute (e.g., 'weather_fetcher').",
                     },
-                    "args": {
-                        "type": "object",
-                        "description": "Skill-specific parameters as declared in the skill's manifest. Use 'request' key for natural language descriptions (e.g., {'request': 'search for quantum computing'}), or structured parameters (e.g., {'operation': 'read', 'path': '/tmp/file.txt'}).",
+                    "request": {
+                        "type": "string",
+                        "description": "Natural language description of what you want the skill to do.",
                     },
                 },
-                "required": ["skill_name", "args"],
+                "required": ["skill_name", "request"],
+                "additionalProperties": True,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": TOOL_DOWNLOAD_SKILL,
+            "description": "Download and install a remote skill from the skill server to the local environment. Use this ONLY AFTER search_skill has found a matching remote skill.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "skill_name": {
+                        "type": "string",
+                        "description": "The exact name of the remote skill found via search_skill.",
+                    }
+                },
+                "required": ["skill_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": TOOL_CREATE_SKILL,
+            "description": "Create a NEW skill from scratch ONLY when search_skill returns NO results from both local and remote. This writes the skill to the local file system.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "request": {
+                        "type": "string",
+                        "description": "Natural language description of what skill to create, including name, purpose, language, and functionality details.",
+                    },
+                },
+                "required": ["request"],
             },
         },
     },
 ]
 
-AGENT_TOOL_SCHEMAS: list[dict[str, Any]] = SKILL_SEARCH_EXECUTE_SCHEMAS
+TOOL_ASK_USER_SCHEMA: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": TOOL_ASK_USER,
+        "description": "Ask the user a question when you need information that only the user can provide. The execution will pause until the user responds.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The question to ask the user.",
+                },
+            },
+            "required": ["question"],
+        },
+    },
+}
+
+AGENT_TOOL_SCHEMAS: list[dict[str, Any]] = SKILL_SEARCH_EXECUTE_SCHEMAS + [
+    TOOL_ASK_USER_SCHEMA
+]
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -85,32 +146,31 @@ class ToolDispatcher:
     """Unified entry point for executing all tools under policy guard.
 
     Handles:
-    - search_skill / execute_skill via SkillGateway
+    - search_skill / execute_skill / download_skill / create_skill via SkillGateway
     """
 
     def __init__(
         self,
-        policy_manager: PolicyManager,
         skill_gateway: SkillGateway,
         session_id: str = "",
+        on_skills_changed: SkillsChangedCallback | None = None,
+        on_skill_step: Any | None = None,
     ):
-        self.policy_manager = policy_manager
         self._gateway = skill_gateway
         self._session_id = session_id
-        self._last_skill_refresh_ts: float = 0.0
-        self._refresh_interval_sec: float = 1.0
-        self._session_searched: dict[str, bool] = {}
+        self._on_skills_changed = on_skills_changed
+        self._on_skill_step = on_skill_step
 
     def set_session_id(self, session_id: str) -> None:
         self._session_id = session_id
-        self._session_searched.setdefault(session_id, False)
 
-    def set_skill_gateway(self, gateway: SkillGateway) -> None:
-        self._gateway = gateway
+    def set_on_skills_changed(self, callback: SkillsChangedCallback | None) -> None:
+        """Set callback invoked after create_skill / download_skill succeeds."""
+        self._on_skills_changed = callback
 
-    def mark_session_searched(self, session_id: str) -> None:
-        """Mark a session as having performed a skill search."""
-        self._session_searched[session_id] = True
+    def set_on_skill_step(self, callback: Any | None) -> None:
+        """Set callback invoked during skill execution for each step."""
+        self._on_skill_step = callback
 
     async def execute(self, tool_name: str, args: dict[str, Any]) -> str:
         """Execute an agent-exposed tool by name."""
@@ -124,8 +184,13 @@ class ToolDispatcher:
                 result = await self._search_skill(args)
             elif tool_name == TOOL_EXECUTE_SKILL:
                 result = await self._execute_skill(args)
+            elif tool_name == TOOL_DOWNLOAD_SKILL:
+                result = await self._download_skill(args)
+            elif tool_name == TOOL_CREATE_SKILL:
+                result = await self._create_skill(args)
             else:
-                raise ValueError(f"Unknown tool: {tool_name}")
+                # Hallucination Interceptor: Auto-convert skill name to execute_skill
+                result = await self._handle_hallucinated_skill_call(tool_name, args)
 
             duration = time.monotonic() - start_time
             log_tool_end(tool_name, result, duration, success=True)
@@ -137,68 +202,139 @@ class ToolDispatcher:
             log_tool_end(tool_name, error_result, duration, success=False)
             raise
 
+    async def _handle_hallucinated_skill_call(
+        self, tool_name: str, args: dict[str, Any]
+    ) -> str:
+        """Intercept hallucinated skill calls — validate existence before converting."""
+        logger.warning(
+            "Hallucination detected: LLM tried to call '{}' directly.",
+            tool_name,
+        )
+        installed_names = await self._resolve_installed_skill_names()
+
+        if tool_name not in installed_names:
+            close = get_close_matches(tool_name, installed_names, n=3, cutoff=0.5)
+            suggestion = (
+                f" Did you mean one of: {', '.join(close)}?"
+                if close
+                else " Use search_skill to find available skills."
+            )
+            return json.dumps(
+                {
+                    "ok": False,
+                    "status": "failed",
+                    "error_code": "UNKNOWN_TOOL",
+                    "summary": f"'{tool_name}' is not a valid tool or installed skill.{suggestion}",
+                },
+                ensure_ascii=False,
+            )
+
+        request = args.get("request", "")
+        if not request:
+            request = args.get("query", "") or "Execute the skill"
+        converted_args = {
+            "skill_name": tool_name,
+            "request": str(request),
+            **{
+                k: v
+                for k, v in args.items()
+                if k not in ("skill_name", "request", "query")
+            },
+        }
+        return await self._execute_skill(converted_args)
+
+    async def _resolve_installed_skill_names(self) -> set[str]:
+        """Return the set of currently installed skill names."""
+        try:
+            manifests = await self._gateway.discover()
+            return {m.name for m in manifests}
+        except Exception:
+            logger.warning("Failed to discover installed skills", exc_info=True)
+            return set()
+
     async def _search_skill(self, args: dict[str, Any]) -> str:
-        """Search for skills. Local/builtin skills are already in the system
-        prompt, so this only returns *additional* cloud skills."""
-
-        await self._refresh_skills_if_needed()
-
+        """Search for skills across local and cloud sources with guided output."""
         query = str(args.get("query", "")).strip()
         k = int(args.get("k", 5) or 5)
 
         if not query:
-            return json.dumps({
-                "ok": False,
-                "status": "failed",
-                "error_code": "INVALID_INPUT",
-                "summary": "query is required for search_skill",
-            }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "ok": False,
+                    "status": "failed",
+                    "error_code": "INVALID_INPUT",
+                    "summary": "query is required for search_skill",
+                },
+                ensure_ascii=False,
+                default=str,
+            )
 
-        local_models = self._gateway.discover()
-        local_count = len(local_models)
-        logger.info(
-            "search_skill: local_in_context=%d, local_names=%s",
-            local_count,
-            [m.name for m in local_models],
-        )
-
-        cloud_skills = []
+        all_skills = []
         try:
-            cloud_results = await self._gateway.search(query, k=k, cloud_only=True)
-            cloud_skills = [m for m in cloud_results if m.governance.source == "cloud"]
+            all_skills = await self._gateway.search(query, k=k, cloud_only=False)
         except Exception as e:
-            logger.debug("Cloud search failed: {}", e)
+            logger.warning("Skill search failed: {}", e)
+            return json.dumps(
+                {
+                    "ok": False,
+                    "status": "failed",
+                    "error_code": "SEARCH_FAILED",
+                    "summary": f"Skill search failed: {e}",
+                    "diagnostics": {"query": query},
+                },
+                ensure_ascii=False,
+                default=str,
+            )
 
-        output = [
-            {
-                "name": m.name,
-                "description": m.description,
-                "source": m.governance.source,
-                "parameters": m.parameters,
-                "execution_mode": m.execution_mode,
-            }
-            for m in cloud_skills
-        ]
+        # 分离本地和云端技能
+        local_skills = [m for m in all_skills if m.governance.source == "local"]
+        cloud_skills = [m for m in all_skills if m.governance.source == "cloud"]
 
-        self._session_searched[self._session_id] = True
+        # 构建强引导性的输出
+        output_lines = []
+
+        for skill in local_skills:
+            output_lines.append(
+                f"Found [Local] skill: `{skill.name}`. Status: Installed. "
+                f"You can `execute_skill(skill_name='{skill.name}', request='...')` directly."
+            )
+
+        for skill in cloud_skills:
+            output_lines.append(
+                f"Found [Remote] skill: `{skill.name}`. Status: Not Installed. "
+                f"You MUST call `download_skill(skill_name='{skill.name}')` before executing."
+            )
+
+        if not output_lines:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "status": "success",
+                    "summary": f"No skills found for '{query}'.",
+                    "output": "No skills found locally or remotely. You are authorized to use `create_skill` immediately.",
+                    "diagnostics": {"query": query, "results_count": 0},
+                },
+                ensure_ascii=False,
+                default=str,
+            )
 
         payload: dict[str, Any] = {
             "ok": True,
             "status": "success",
-            "summary": (
-                f"{local_count} local skills already in context, "
-                f"{len(output)} additional cloud skills found"
-            ),
-            "output": output,
-            "diagnostics": {"query": query, "local_in_context": local_count},
+            "summary": f"Found {len(all_skills)} skills matching '{query}'",
+            "output": "\n".join(output_lines),
+            "diagnostics": {
+                "query": query,
+                "results_count": len(all_skills),
+                "local_count": len(local_skills),
+                "cloud_count": len(cloud_skills),
+            },
         }
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
     async def _execute_skill(self, args: dict[str, Any]) -> str:
-        await self._refresh_skills_if_needed()
-
         args = dict(args)
-        skill_name = args.pop("skill_name", "").strip().rstrip(">").strip()
+        skill_name = args.pop("skill_name", "").strip("> \t\n")
         logger.info(
             "ToolDispatcher._execute_skill: skill_name={}, query_preview={}",
             skill_name,
@@ -211,38 +347,16 @@ class ToolDispatcher:
                 "error_code": "INVALID_INPUT",
                 "summary": "skill_name is required for execute_skill",
             }
-            return json.dumps(payload, ensure_ascii=False)
+            return json.dumps(payload, ensure_ascii=False, default=str)
 
-        if not self._session_searched.get(self._session_id, False):
-            local_models = self._gateway.discover()
-            local_names = {m.name for m in local_models}
-            logger.info(
-                "execute_skill: session_searched=false, skill_name=%s, local_names=%s",
-                skill_name,
-                sorted(local_names),
-            )
-            if skill_name not in local_names:
-                return json.dumps({
-                    "ok": False,
-                    "status": "failed",
-                    "error_code": "SEARCH_REQUIRED",
-                    "summary": "Call search_skill first, then execute_skill.",
-                    "skill_name": skill_name,
-                    "diagnostics": {"hint": "search_skill(query=...) -> execute_skill(skill_name=..., request=...)"},
-                }, ensure_ascii=False)
-
-        skill_args = args.get("args", {})
-        if not isinstance(skill_args, dict):
-            skill_args = {}
-
-        if "request" not in skill_args:
-            fallback_request = args.get("request")
-            if isinstance(fallback_request, str) and fallback_request.strip():
-                skill_args["request"] = fallback_request.strip()
+        # 扁平化参数：剩余的所有参数（包括 request）都传给 skill
+        skill_args = args
 
         envelope = await self._gateway.execute(
             skill_name=skill_name,
             params=skill_args,
+            session_id=self._session_id,
+            on_step=self._on_skill_step,
         )
 
         logger.info(
@@ -267,22 +381,107 @@ class ToolDispatcher:
             payload["artifacts"] = envelope.artifacts
         if envelope.diagnostics:
             payload["diagnostics"] = envelope.diagnostics
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
-    async def _refresh_skills_if_needed(self) -> None:
-        """Refresh local skills from disk with lightweight throttling."""
-        now = time.monotonic()
-        if now - self._last_skill_refresh_ts < self._refresh_interval_sec:
-            return
+    async def _download_skill(self, args: dict[str, Any]) -> str:
+        """Download a cloud skill to local storage."""
+        skill_name = str(args.get("skill_name", "")).strip()
 
-        self._last_skill_refresh_ts = now
-
-        library = getattr(self._gateway, "_library", None)
-        refresh_fn = getattr(library, "refresh_from_disk", None)
-        if refresh_fn is None:
-            return
+        if not skill_name:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "status": "failed",
+                    "error_code": "INVALID_INPUT",
+                    "summary": "skill_name is required for download_skill",
+                },
+                ensure_ascii=False,
+                default=str,
+            )
 
         try:
-            await refresh_fn()
+            skill = await self._gateway.install(skill_name)
+            if skill:
+                self._notify_skills_changed()
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "status": "success",
+                        "summary": f"Skill '{skill_name}' downloaded and installed successfully.",
+                        "skill_name": skill.name,
+                        "output": f"Skill '{skill_name}' is now installed and ready to use via `execute_skill(skill_name='{skill_name}', request='...')`",
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+            else:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "status": "failed",
+                        "error_code": "DOWNLOAD_FAILED",
+                        "summary": f"Failed to download skill '{skill_name}'. It may not exist in the cloud or the download failed.",
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
         except Exception as e:
-            logger.debug("refresh_from_disk failed before search: {}", e)
+            logger.exception("Failed to download skill")
+            return json.dumps(
+                {
+                    "ok": False,
+                    "status": "failed",
+                    "error_code": "INTERNAL_ERROR",
+                    "summary": f"Error downloading skill: {str(e)}",
+                },
+                ensure_ascii=False,
+                default=str,
+            )
+
+    async def _create_skill(self, args: dict[str, Any]) -> str:
+        """Create a new skill by delegating to skill-creator."""
+        request = str(args.get("request", "")).strip()
+
+        # Validate required fields
+        if not request:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "status": "failed",
+                    "error_code": "INVALID_INPUT",
+                    "summary": "request is required for create_skill - describe what skill you want to create",
+                },
+                ensure_ascii=False,
+                default=str,
+            )
+
+        # Delegate to skill-creator
+        execute_args = {
+            "skill_name": "skill-creator",
+            "request": request,
+        }
+
+        logger.info(
+            "Delegating create_skill to skill-creator: request_preview={}",
+            request[:100],
+        )
+        result = await self._execute_skill(execute_args)
+
+        # Parse result and add skills directory info
+        try:
+            result_dict = json.loads(result)
+            if result_dict.get("ok"):
+                self._notify_skills_changed()
+                return json.dumps(result_dict, ensure_ascii=False, default=str)
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+        return result
+
+    def _notify_skills_changed(self) -> None:
+        """Invoke the skills-changed callback if registered."""
+        if self._on_skills_changed is not None:
+            try:
+                self._on_skills_changed()
+            except Exception:
+                logger.warning("on_skills_changed callback failed", exc_info=True)

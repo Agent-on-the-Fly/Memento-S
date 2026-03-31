@@ -103,7 +103,7 @@ class SkillCreate(BaseModel):
     name: str
     display_name: str | None = None
     description: str | None = None
-    version: str = "0.1.0"
+    version: str = "0.2.0"
     author: str | None = None
     source_type: str
     source_url: str | None = None

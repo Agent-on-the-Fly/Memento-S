@@ -15,6 +15,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from middleware.config import g_config
+from core.protocol.types import PlanStepStatus
+
+# ── Constants ────────────────────────────────────────────────────
+GOAL_MAX_LENGTH = 200
+RECENT_ACTIONS_DISPLAY = 5
+RECENT_ACTIONS_INTENT = 3
 
 
 @dataclass
@@ -149,24 +155,35 @@ class SessionContext:
     action_history: list[ActionRecord] = field(default_factory=list)
     turn_count: int = 0
 
+    # Deprecated — canonical plan state lives in AgentRunState.
+    # Kept for backward compatibility; use AgentRunState.sync_plan_state() instead.
     _plan_steps: list[str] = field(default_factory=list)
-    _plan_statuses: list[str] = field(default_factory=list)
+    _plan_statuses: list[PlanStepStatus] = field(default_factory=list)
 
-    # ── Plan tracking ────────────────────────────────────────────
+    # ── Plan tracking (deprecated — prefer AgentRunState) ────────
 
     def set_plan(self, steps: list[str]) -> None:
-        """设置/替换任务计划（纯字符串描述列表）。"""
+        """设置/替换任务计划（纯字符串描述列表）。
+
+        .. deprecated:: Use ``AgentRunState.sync_plan_state()`` instead.
+        """
         self._plan_steps = list(steps)
-        self._plan_statuses = ["pending"] * len(steps)
+        self._plan_statuses = [PlanStepStatus.PENDING] * len(steps)
 
     def mark_step_done(self, idx: int) -> None:
-        """标记第 idx 步完成。"""
+        """标记第 idx 步完成。
+
+        .. deprecated:: Use ``AgentRunState.advance_plan_step()`` instead.
+        """
         if 0 <= idx < len(self._plan_statuses):
-            self._plan_statuses[idx] = "done"
+            self._plan_statuses[idx] = PlanStepStatus.DONE
 
     @property
     def has_active_plan(self) -> bool:
-        return bool(self._plan_steps and any(s == "pending" for s in self._plan_statuses))
+        return bool(
+            self._plan_steps
+            and any(s == PlanStepStatus.PENDING for s in self._plan_statuses)
+        )
 
     @property
     def plan_step_count(self) -> int:
@@ -180,8 +197,8 @@ class SessionContext:
 
         if self.turn_count == 1:
             goal = user_msg.strip()
-            if len(goal) > 200:
-                goal = goal[:197] + "..."
+            if len(goal) > GOAL_MAX_LENGTH:
+                goal = goal[: GOAL_MAX_LENGTH - 3] + "..."
             self.session_goal = goal
 
     def add_action(self, record: ActionRecord) -> None:
@@ -189,13 +206,17 @@ class SessionContext:
 
     # ── Prompt rendering ─────────────────────────────────────────
 
-    def to_prompt_section(self) -> str:
-        """Format for injection into system prompt tail."""
+    def to_prompt_section(self, *, external_plan_section: str = "") -> str:
+        """Format for injection into system prompt tail.
+
+        Args:
+            external_plan_section: Pre-rendered plan markdown from
+                ``AgentRunState.to_plan_prompt_section()``. When provided,
+                the internal ``_plan_steps`` are skipped.
+        """
         lines = ["## Session State"]
 
         env = self.environment
-        if env.cwd:
-            lines.append(f"Working directory: {env.cwd}")
         if env.project_type:
             lines.append(f"Project type: {env.project_type}")
         if env.git_branch:
@@ -207,20 +228,26 @@ class SessionContext:
         if self.session_goal:
             lines.append(f"\nCurrent goal: {self.session_goal}")
 
-        if self._plan_steps:
+        if external_plan_section:
+            lines.append(f"\n{external_plan_section}")
+        elif self._plan_steps:
             lines.append("\nTask plan:")
+            _STATUS_MARKERS = {
+                PlanStepStatus.PENDING: "[ ]",
+                PlanStepStatus.IN_PROGRESS: "[~]",
+                PlanStepStatus.DONE: "[x]",
+                PlanStepStatus.FAILED: "[!]",
+            }
             for i, step_desc in enumerate(self._plan_steps):
                 status = (
                     self._plan_statuses[i]
                     if i < len(self._plan_statuses)
-                    else "pending"
+                    else PlanStepStatus.PENDING
                 )
-                marker = {"pending": "[ ]", "done": "[x]", "failed": "[!]"}.get(
-                    status, "[ ]"
-                )
+                marker = _STATUS_MARKERS.get(status, "[ ]")
                 lines.append(f"  {marker} {step_desc}")
 
-        recent = self.action_history[-5:]
+        recent = self.action_history[-RECENT_ACTIONS_DISPLAY:]
         if recent:
             lines.append(f"\nRecent actions ({len(self.action_history)} total):")
             for r in recent:

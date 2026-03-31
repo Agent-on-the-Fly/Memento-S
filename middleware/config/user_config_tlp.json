@@ -33,5 +33,48 @@
     "UV_PIP_EXTRA_INDEX_URL": "https://mirrors.aliyun.com/pypi/simple/ https://mirrors.huaweicloud.com/repository/pypi/simple/",
     "UV_PIP_TRUSTED_HOST": "mirrors.tuna.tsinghua.edu.cn mirrors.aliyun.com mirrors.huaweicloud.com",
     "TAVILY_API_KEY": ""
+  },
+  "im": {
+    "platform": "feishu",
+    "feishu": {
+      "enabled": false,
+      "app_id": "",
+      "app_secret": "",
+      "encrypt_key": "",
+      "verification_token": "",
+      "base_url": "https://open.feishu.cn"
+    },
+    "dingtalk": {
+      "enabled": false,
+      "app_key": "",
+      "app_secret": "",
+      "webhook_url": "",
+      "webhook_secret": "",
+      "base_url": "https://api.dingtalk.com"
+    },
+    "wecom": {
+      "enabled": false,
+      "corp_id": "",
+      "agent_id": "",
+      "secret": "",
+      "token": "",
+      "encoding_aes_key": "",
+      "bot_id": "",
+      "bot_secret": "",
+      "webhook_url": ""
+    },
+    "wechat": {
+      "enabled": false,
+      "base_url": "https://ilinkai.weixin.qq.com",
+      "token": ""
+    }
+  },
+  "gateway": {
+    "enabled": true,
+    "mode": "gateway",
+    "websocket_host": "127.0.0.1",
+    "websocket_port": 8765,
+    "webhook_host": "127.0.0.1",
+    "webhook_port": 18080
   }
 }

@@ -14,11 +14,12 @@ from typing import Callable, Optional
 import flet as ft
 
 from gui.i18n import t, tp
-from middleware.storage import SessionService, SessionRead
+from middleware.storage import SessionRead
+from shared.chat import ChatManager
 
 
 class SessionListItem(ft.Container):
-    """Session list item - displays a single Session"""
+    """Session list item - displays a single Session with modern card style"""
 
     def __init__(
         self,
@@ -30,6 +31,7 @@ class SessionListItem(ft.Container):
     ):
         super().__init__()
         self.session = session
+        self.is_active = is_active
 
         # Format time (sorted/displayed by created_at, not updated_at)
         try:
@@ -43,14 +45,14 @@ class SessionListItem(ft.Container):
         except Exception:
             time_str = ""
 
-        # Build title
+        # Build title with modern styling
         title_text = ft.Text(
             session.title or t("sidebar.empty"),
-            size=14,
-            weight=ft.FontWeight.W_600 if is_active else ft.FontWeight.W_400,
+            size=13,
+            weight=ft.FontWeight.W_500 if is_active else ft.FontWeight.W_400,
             max_lines=1,
             overflow=ft.TextOverflow.ELLIPSIS,
-            color=ft.Colors.WHITE,
+            color=ft.Colors.WHITE if is_active else ft.Colors.GREY_300,
         )
 
         # Build subtitle (show message count and time)
@@ -67,21 +69,22 @@ class SessionListItem(ft.Container):
                     size=10,
                     color=ft.Colors.GREY_500,
                 ),
-                ft.Text("•", size=10, color=ft.Colors.GREY_600),
-                ft.Text(
-                    time_str,
-                    size=10,
-                    color=ft.Colors.GREY_500,
-                ),
+                # ft.Text("•", size=9, color=ft.Colors.GREY_700),
+                # ft.Text(
+                #     time_str,
+                #     size=10,
+                #     color=ft.Colors.GREY_500,
+                #     overflow=ft.TextOverflow.ELLIPSIS,
+                # ),
             ],
             spacing=4,
         )
 
-        # Build icon
+        # Build icon - more subtle
         leading_icon = ft.Icon(
-            ft.icons.Icons.CHAT_BUBBLE,
-            color=ft.Colors.BLUE_400 if is_active else ft.Colors.GREY_500,
-            size=20,
+            ft.icons.Icons.CHAT_BUBBLE_OUTLINE,
+            color=ft.Colors.BLUE_400 if is_active else ft.Colors.GREY_600,
+            size=18,
         )
 
         # Build context menu
@@ -103,50 +106,62 @@ class SessionListItem(ft.Container):
                 )
             )
 
+        # Build main content column
+        content_column = ft.Column(
+            [
+                title_text,
+                subtitle_row,
+            ],
+            spacing=2,
+            expand=True,
+        )
+
         # Build main row
         main_row = ft.Row(
             [
                 leading_icon,
-                ft.Column(
-                    [
-                        title_text,
-                        subtitle_row,
-                    ],
-                    spacing=2,
-                    expand=True,
-                ),
+                content_column,
                 ft.PopupMenuButton(
                     icon=ft.icons.Icons.MORE_VERT,
                     items=menu_items if menu_items else None,
-                    icon_color=ft.Colors.GREY_500,
+                    icon_color=ft.Colors.GREY_600,
+                    icon_size=18,
                     tooltip=t("sidebar.tooltip_actions"),
                 )
                 if menu_items
-                else ft.Container(width=40),
+                else ft.Container(width=32),
             ],
-            spacing=12,
+            spacing=10,
             alignment=ft.MainAxisAlignment.START,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-        # Container config
+        # Modern card container config
         self.content = main_row
-        self.padding = ft.Padding(12, 10, 8, 10)
-        self.bgcolor = ft.Colors.BLUE_900 if is_active else None
-        self.border_radius = ft.BorderRadius.all(8)
-        self.animate = ft.Animation(200, ft.AnimationCurve.EASE_OUT)
+        self.padding = ft.Padding(10, 8, 6, 8)
+        # 使用左侧边框指示器表示选中状态
+        self.border = ft.Border(
+            left=ft.BorderSide(
+                3, ft.Colors.BLUE_400 if is_active else ft.Colors.TRANSPARENT
+            )
+        )
+        self.border_radius = ft.BorderRadius.all(6)
+        self.bgcolor = (
+            ft.Colors.with_opacity(0.08, ft.Colors.BLUE_400) if is_active else None
+        )
+        self.animate = ft.Animation(150, ft.AnimationCurve.EASE_OUT)
         self.on_click = lambda e: on_click(session.id) if on_click else None
         self.on_hover = self._on_hover
         self.data = session.id
 
     def _on_hover(self, e):
-        """Hover effect"""
+        """Subtle hover effect"""
+        if self.is_active:
+            return
         if e.data == "true":
-            if self.bgcolor != ft.Colors.BLUE_900:
-                self.bgcolor = ft.Colors.GREY_800
+            self.bgcolor = ft.Colors.with_opacity(0.04, ft.Colors.WHITE)
         else:
-            if self.bgcolor != ft.Colors.BLUE_900:
-                self.bgcolor = None
+            self.bgcolor = None
         self.update()
 
 
@@ -174,9 +189,6 @@ class SessionSidebar(ft.Container):
         self.on_rename_session = on_rename_session
         self.on_load_more = on_load_more
 
-        # Services
-        self._session_service = SessionService()
-
         # State
         self.sessions: list[SessionRead] = []
         self.active_session_id: Optional[str] = None
@@ -194,21 +206,18 @@ class SessionSidebar(ft.Container):
             if on_new_chat:
                 on_new_chat()
 
-        self._new_chat_button = ft.ElevatedButton(
+        # Modern outline style New Chat button
+        self._new_chat_button = ft.OutlinedButton(
             t("sidebar.new_chat"),
-            icon=ft.icons.Icons.ADD,
+            icon=ft.icons.Icons.ADD_ROUNDED,
             on_click=_on_new_chat_click,
             style=ft.ButtonStyle(
-                color=ft.Colors.WHITE,
-                bgcolor=ft.Colors.BLUE_700,
+                color=ft.Colors.GREY_300,
+                side=ft.BorderSide(1, ft.Colors.GREY_700),
+                shape=ft.RoundedRectangleBorder(radius=6),
+                padding=ft.Padding(12, 8, 12, 8),
             ),
-            width=200,
-        )
-
-        self._refresh_button = ft.IconButton(
-            icon=ft.icons.Icons.REFRESH,
-            tooltip=t("sidebar.refresh"),
-            on_click=lambda e: asyncio.create_task(self.refresh()),
+            width=172,
         )
 
         self._load_more_button = ft.TextButton(
@@ -216,49 +225,53 @@ class SessionSidebar(ft.Container):
             on_click=lambda e: asyncio.create_task(self._load_more()),
         )
 
-        # Layout
+        # Modern layout with cleaner structure
         self.content = ft.Column(
             [
-                # Header
+                # Compact header with logo/title
                 ft.Container(
                     content=ft.Row(
                         [
-                            ft.Text(
-                                t("sidebar.title"), size=16, weight=ft.FontWeight.BOLD
+                            ft.Icon(
+                                ft.icons.Icons.CHAT_ROUNDED,
+                                size=18,
+                                color=ft.Colors.BLUE_400,
                             ),
-                            self._refresh_button,
+                            ft.Text(
+                                t("sidebar.title"),
+                                size=14,
+                                weight=ft.FontWeight.W_600,
+                                color=ft.Colors.GREY_200,
+                            ),
                         ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        spacing=8,
+                        alignment=ft.MainAxisAlignment.START,
                     ),
-                    padding=ft.Padding(16, 12, 16, 8),
+                    padding=ft.Padding(16, 16, 16, 8),
                 ),
                 # New chat button
                 ft.Container(
                     content=self._new_chat_button,
-                    padding=ft.Padding(16, 0, 16, 8),
+                    padding=ft.Padding(12, 4, 12, 12),
                 ),
-                # Divider
-                ft.Divider(height=1, color=ft.Colors.GREY_800),
-                # Session list
+                # Session list (移除多余的分割线)
                 ft.Container(
                     content=self._session_list,
-                    padding=ft.Padding(8, 8, 8, 8),
+                    padding=ft.Padding(8, 0, 8, 8),
                     expand=True,
                 ),
                 # Load more
-                ft.Container(
-                    content=self._load_more_button,
-                    alignment=ft.Alignment(0, 0),
-                    padding=ft.Padding(0, 8, 0, 8),
-                ),
+                # ft.Container(
+                #     content=self._load_more_button,
+                #     alignment=ft.Alignment(0, 0),
+                #     padding=ft.Padding(0, 8, 0, 8),
+                # ),
             ],
             spacing=0,
             expand=True,
         )
 
-        self.width = 280
-        self.bgcolor = ft.Colors.GREY_900
-        self.border = ft.Border(right=ft.BorderSide(1, ft.Colors.GREY_800))
+        self.expand = True
 
         # 注册语言切换观察者
         from gui.i18n import add_observer
@@ -269,7 +282,6 @@ class SessionSidebar(ft.Container):
         """语言切换时的回调 - 刷新所有 UI 文本"""
         # 刷新按钮文本
         self._new_chat_button.text = t("sidebar.new_chat")
-        self._refresh_button.tooltip = t("sidebar.refresh")
         self._load_more_button.text = t("sidebar.load_more")
 
         # 刷新标题
@@ -284,7 +296,7 @@ class SessionSidebar(ft.Container):
     async def refresh(self):
         """Refresh session list from storage"""
         try:
-            sessions = await self._session_service.list_recent(limit=50)
+            sessions = await ChatManager.list_sessions(limit=50)
             # Sort by created_at descending (newest created session first)
             self.sessions = sorted(
                 sessions,
@@ -318,16 +330,16 @@ class SessionSidebar(ft.Container):
         groups = self._group_by_time_period(self.sessions)
 
         for period_name, sessions in groups:
-            # Period header
+            # Period header - modern subtle style
             self._session_list.controls.append(
                 ft.Container(
                     content=ft.Text(
-                        period_name,
-                        size=11,
-                        color=ft.Colors.GREY_500,
-                        weight=ft.FontWeight.W_500,
+                        period_name.upper(),
+                        size=9,
+                        color=ft.Colors.GREY_600,
+                        weight=ft.FontWeight.W_600,
                     ),
-                    padding=ft.Padding(12, 8, 12, 4),
+                    padding=ft.Padding(12, 12, 12, 6),
                 )
             )
 

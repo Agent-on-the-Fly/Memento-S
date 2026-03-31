@@ -17,16 +17,19 @@ from middleware.llm.schema import ToolCall
 # JSON extraction
 # =============================================================================
 
+_JSON_CODEBLOCK_RE = re.compile(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```")
+_JSON_BARE_RE = re.compile(r"\{[\s\S]*\}")
+
 
 def extract_json(text: str) -> dict:
     """Extract a JSON object from LLM output, tolerating markdown code blocks."""
     text = text.strip()
-    m = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
+    m = _JSON_CODEBLOCK_RE.search(text)
     if m:
         return json.loads(m.group(1))
     if text.startswith("{"):
         return json.loads(text)
-    m = re.search(r"\{[\s\S]*\}", text)
+    m = _JSON_BARE_RE.search(text)
     if m:
         return json.loads(m.group(0))
     raise ValueError(f"No JSON object found in: {text[:200]}")
@@ -49,9 +52,7 @@ def mentions_skill_name(user_text: str, skill_name: str) -> bool:
     text = user_text.lower()
     name = skill_name.lower()
     return (
-        name in text
-        or name.replace("-", "_") in text
-        or name.replace("_", "-") in text
+        name in text or name.replace("-", "_") in text or name.replace("_", "-") in text
     )
 
 
@@ -71,28 +72,25 @@ def can_direct_execute_skill(user_content: str, args: dict[str, Any]) -> bool:
 
 def extract_explicit_skill_name(
     user_content: str,
-    discover_fn: Any,
+    local_skill_names: list[str],
 ) -> str | None:
     """Extract an explicitly mentioned skill name from user content.
 
     Args:
         user_content: The raw user message.
-        discover_fn: A callable that returns a list of skill manifests
-                     (each with a ``.name`` attribute), e.g. ``gateway.discover``.
+        local_skill_names: A list of available skill names.
     """
     text = normalize_skill_name(user_content)
     if not text:
         return None
 
     try:
-        local_names = [m.name for m in discover_fn()]
+        for name in local_skill_names:
+            n = normalize_skill_name(name)
+            if n and n in text:
+                return name
     except Exception:
         return None
-
-    for name in local_names:
-        n = normalize_skill_name(name)
-        if n and n in text:
-            return name
     return None
 
 

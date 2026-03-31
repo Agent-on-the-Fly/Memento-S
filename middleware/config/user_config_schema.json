@@ -17,12 +17,13 @@
     },
     "llm": {
       "type": "object",
-      "required": ["active_profile", "profiles"],
+      "x-managed-by": "user",
+      "x-description": "完全由用户控制，模板不自动添加默认值",
       "properties": {
-        "active_profile": { "type": "string", "minLength": 1 },
+        "active_profile": { "type": "string" },
         "profiles": {
           "type": "object",
-          "minProperties": 1,
+          "x-managed-by": "user",
           "additionalProperties": { "$ref": "#/definitions/userLlmProfile" }
         }
       }
@@ -47,6 +48,10 @@
         "model": { "type": "string", "minLength": 1 },
         "api_key": { "type": ["string", "null"] },
         "base_url": { "type": "string", "minLength": 1 },
+        "litellm_provider": {
+          "type": "string",
+          "description": "Optional. Usually auto-detected — only set this to override when auto-detection fails (e.g. 'ollama_chat' for native Ollama endpoint without /v1)."
+        },
         "extra_headers": {
           "type": "object",
           "additionalProperties": { "type": "string" }

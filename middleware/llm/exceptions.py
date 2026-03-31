@@ -61,3 +61,11 @@ class LLMContentFilterError(LLMException):
 
     def __init__(self, message: str = "Content filtered", *, model: str | None = None):
         super().__init__(message, model=model, retryable=False)
+
+class LLMContextWindowError(LLMException):
+    """上下文窗口超限。"""
+
+    def __init__(
+        self, message: str = "Context window exceeded", *, model: str | None = None
+    ):
+        super().__init__(message, model=model, retryable=False)

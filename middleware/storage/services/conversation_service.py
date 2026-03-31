@@ -39,11 +39,17 @@ class ConversationService(BaseService):
         return await self._with_session(lambda db: self._delete(db, conversation_id))
 
     async def list_by_session(
-        self, session_id: str, limit: int = 1000
+        self,
+        session_id: str,
+        limit: int = 1000,
+        *,
+        exclude_tool: bool = False,
     ) -> list[ConversationRead]:
         """List conversations by session, ordered by sequence."""
         return await self._with_session(
-            lambda db: self._list_by_session(db, session_id, limit)
+            lambda db: self._list_by_session(
+                db, session_id, limit, exclude_tool=exclude_tool
+            )
         )
 
     async def get_next_sequence(self, session_id: str) -> int:
@@ -135,18 +141,26 @@ class ConversationService(BaseService):
         return True
 
     async def _list_by_session(
-        self, db: AsyncSession, session_id: str, limit: int
+        self,
+        db: AsyncSession,
+        session_id: str,
+        limit: int,
+        *,
+        exclude_tool: bool = False,
     ) -> list[ConversationRead]:
         """List by session implementation."""
         stmt = (
             select(Conversation)
             .where(Conversation.session_id == session_id)
             .order_by(Conversation.sequence.asc())
-            .limit(limit)
         )
+        if exclude_tool:
+            stmt = stmt.where(Conversation.role != "tool")
+        stmt = stmt.limit(limit)
         result = await db.execute(stmt)
         rows = result.scalars().all()
-        return [ConversationRead.model_validate(x) for x in rows]
+        convs = [ConversationRead.model_validate(x) for x in rows]
+        return convs
 
     async def _get_next_sequence(self, db: AsyncSession, session_id: str) -> int:
         """Get next sequence number for a session."""

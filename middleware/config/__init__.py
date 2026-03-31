@@ -3,7 +3,7 @@ Memento-S 配置管理模块（文件模式）
 
 提供：
 - JSON 配置文件加载和 Schema 校验
-- 用户目录 ~/.memento_s 自动初始化
+- 用户目录 ~/memento_s 自动初始化
 - 缺失配置文件时从模板自动复制
 - 启动自检 bootstrap
 
@@ -23,10 +23,12 @@ Memento-S 配置管理模块（文件模式）
 
 from .config_manager import ConfigManager, g_config
 from .config_models import GlobalConfig
+from .schema_meta import SchemaMetadata
 
 
 __all__ = [
     "ConfigManager",
     "GlobalConfig",
+    "SchemaMetadata",
     "g_config",
 ]

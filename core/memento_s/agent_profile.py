@@ -31,7 +31,7 @@ class AgentProfile:
     available_tools: list[str] = field(default_factory=list)
 
     @classmethod
-    def build_from_context(
+    async def build_from_context(
         cls,
         skill_gateway: Any = None,
         config: Any = None,
@@ -53,7 +53,7 @@ class AgentProfile:
         # Discover local skill capabilities (do not mix cloud candidates)
         if skill_gateway is not None:
             try:
-                manifests = skill_gateway.discover()
+                manifests = await skill_gateway.discover()
                 for m in manifests:
                     name = m.name.strip()
                     desc = (m.description or "").strip()

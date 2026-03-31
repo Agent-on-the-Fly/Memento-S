@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Generic, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from middleware.storage.core.engine import get_db_manager
+from middleware.storage.core.engine import DatabaseManager
 
 T = TypeVar("T")
 
@@ -22,23 +22,41 @@ class BaseService:
     - NOT thread-safe (use in single-threaded async context)
 
     Usage:
-        # Method 1: Use auto-managed session (recommended)
-        service = SessionService()
+        # Get DatabaseManager instance (must be initialized first)
+        db_manager = await DatabaseManager.from_config()
+
+        # Create service with db_manager
+        service = SessionService(db_manager)
         session = await service.create(title="test")
 
-        # Method 2: Use manual session for transaction control
+        # Or use manual session for transaction control
         async with service.session() as db:
             session = await service._create(db, title="test")
             await service.commit(db)
     """
 
-    def __init__(self, db_manager=None):
-        """Initialize service with optional db manager.
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        """Initialize service with database manager.
 
         Args:
-            db_manager: Database manager instance. If None, uses global singleton.
+            db_manager: Initialized DatabaseManager instance.
+                       Must be obtained via DatabaseManager.from_config() or
+                       DatabaseManager.instance() after init() is called.
+
+        Raises:
+            RuntimeError: If db_manager is not initialized.
         """
-        self._db_manager = db_manager or get_db_manager()
+        if not getattr(db_manager, "_initialized", False):
+            raise RuntimeError(
+                "DatabaseManager is not initialized. "
+                "Use 'await DatabaseManager.from_config()' to obtain an initialized instance."
+            )
+        self._db_manager = db_manager
+
+    @property
+    def db_manager(self) -> DatabaseManager:
+        """Get the database manager instance."""
+        return self._db_manager
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:

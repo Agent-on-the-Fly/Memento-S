@@ -29,11 +29,13 @@ camel-ai>=0.2.0
 
 # YAML parsing (for skill validation)
 pyyaml>=6.0.0
+python-frontmatter>=1.0.0
 
 # HTTP clients
 httpx>=0.25.0
 aiohttp>=3.9.0
 requests>=2.31.0
+certifi>=2023.7.22
 beautifulsoup4
 markdownify
 
@@ -49,6 +51,7 @@ rank-bm25>=0.2.0
 platformdirs>=4.0.0
 jsonschema>=4.20.0
 loguru>=0.7.0
+inflection
 
 # Storage
 sqlalchemy>=2.0.0
@@ -58,15 +61,26 @@ numpy>=1.24.0,<2.0.0
 alembic>=1.12.0
 
 # GUI
-flet>=0.25.0
-flet-cli>=0.25.0
-# flet-desktop>=0.25.0
+flet==0.82.0
+flet-cli==0.82.0
+#flet-desktop==0.82.0
 
-tiktoken>=0.4.0
+tiktoken>=0.7.0,<0.12.0
 
 
-# IM Platform (Feishu)
+# IM Platform Dependencies
+# Gateway WebSocket support
+websockets==13.1
+# Feishu/Lark IM platform
 lark-oapi>=1.3.0
+dingtalk-stream==0.24.3
 
 # Build Tools
 pyinstaller>=6.0.0
+
+# WeChat SDK Dependencies (3rd/weixin_sdk)
+pycryptodome>=3.15.0  # AES encryption for media uploads
+qrcode[pil]>=7.4.0    # QR code generation for login
+tabulate>=0.9.0       # CLI table formatting
+pysilk>=0.0.1         # SILK voice transcoding (optional)
+python-socks>=2.8.1   # Proxy support

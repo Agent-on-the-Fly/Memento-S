@@ -239,11 +239,11 @@ class Skill(Base):
 
     # 基础信息
     name: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True, comment="技能唯一标识名"
+        String(128), nullable=False, unique=True, comment="技能唯一标识名，给llm识别使用"
     )
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    version: Mapped[str] = mapped_column(String(32), default="0.1.0", nullable=False)
+    version: Mapped[str] = mapped_column(String(32), default="0.2.0", nullable=False)
     author: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     # 状态

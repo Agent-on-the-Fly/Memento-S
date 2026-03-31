@@ -1,5 +1,10 @@
 """CLI for the Memento-S agent."""
 
+# Suppress litellm logging before any imports
+import os
+
+os.environ["LITELLM_LOG"] = "WARNING"
+
 import sys
 from pathlib import Path
 
@@ -16,14 +21,30 @@ if str(_PROJECT_ROOT) not in sys.path:
 import typer
 from rich.console import Console
 
-from cli.commands import agent_command, doctor_command, feishu_bridge_command, verify_command
+from cli.commands import (
+    agent_command,
+    doctor_command,
+    feishu_bridge_command,
+    dingtalk_bridge_command,
+    wecom_bridge_command,
+    im_status_command,
+    gateway_worker_command,
+    wechat_app,
+)
 
+# 版本号管理：开发模式从 version.py 读取，打包模式从包元数据读取
 try:
-    from importlib.metadata import version as _pkg_version
+    # 开发模式：优先从 version.py 读取
+    from version import __version__
+except ImportError:
+    try:
+        # 打包模式：从包元数据读取
+        from importlib.metadata import version as _pkg_version
 
-    __version__ = _pkg_version("memento-s")
-except Exception:
-    __version__ = "0.1.0"
+        __version__ = _pkg_version("memento-s")
+    except Exception as e:
+        print(f"[Warning] Failed to get version, defaulting to 0.2.0: {e}")
+        __version__ = "0.2.0"
 
 app = typer.Typer(name="MementoS", help="Memento-S Agent CLI", no_args_is_help=True)
 console = Console()
@@ -87,35 +108,38 @@ def feishu() -> None:
 
 
 @app.command()
-def verify(
-    audit_only: bool = typer.Option(False, "--audit-only", help="下载 + 仅静态审查"),
-    exec_only: bool = typer.Option(False, "--exec-only", help="下载 + 仅执行验证"),
-    download_only: bool = typer.Option(False, "--download-only", help="仅下载 skill"),
-    sandbox: str = typer.Option("e2b", "--sandbox", help="沙箱类型: e2b / local"),
-    concurrency: int = typer.Option(3, "--concurrency", "-c", help="E2B 并发数"),
-    timeout: int = typer.Option(120, "--timeout", "-t", help="单个 skill 超时(秒)"),
-    output: str = typer.Option(None, "--output", "-o", help="报告 JSON 输出路径"),
-    test_set: str = typer.Option("test_set.jsonl", "--test-set", help="测试集路径"),
-    cache_dir: str = typer.Option(
-        ".verify_cache/skills", "--cache-dir", help="下载缓存目录"
+def dingtalk() -> None:
+    """Start DingTalk Stream bridge: receive messages and reply via Agent."""
+    dingtalk_bridge_command()
+
+
+@app.command()
+def wecom() -> None:
+    """Start WeCom (企业微信) WebSocket bridge: receive messages and reply via Agent."""
+    wecom_bridge_command()
+
+
+# Add wechat subcommand app
+app.add_typer(wechat_app, name="wechat", help="WeChat management commands")
+
+
+@app.command()
+def im_status() -> None:
+    """Check IM platform (Gateway/Bridge) status."""
+    im_status_command()
+
+
+@app.command("gateway-worker")
+def gateway_worker(
+    gateway_url: str = typer.Option(
+        "ws://127.0.0.1:8765", "--url", "-u", help="Gateway WebSocket URL"
     ),
-    limit: int = typer.Option(None, "--limit", "-n", help="只处理前 N 个 (调试用)"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="详细输出"),
+    agent_id: str = typer.Option(
+        "agent_main", "--agent-id", "-a", help="Agent ID for registration"
+    ),
 ) -> None:
-    """批量验证 skill: 从 test_set.jsonl 下载 + 安全审查 + 合规审查 + E2B 沙箱执行"""
-    verify_command(
-        audit_only=audit_only,
-        exec_only=exec_only,
-        download_only=download_only,
-        sandbox=sandbox,
-        concurrency=concurrency,
-        timeout=timeout,
-        output=output,
-        test_set=test_set,
-        cache_dir=cache_dir,
-        limit=limit,
-        verbose=verbose,
-    )
+    """Start Gateway Agent Worker: connect to Gateway and process messages."""
+    gateway_worker_command(gateway_url=gateway_url, agent_id=agent_id)
 
 
 if __name__ == "__main__":

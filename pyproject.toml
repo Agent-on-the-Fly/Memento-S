@@ -1,6 +1,6 @@
 [project]
 name = "memento-s"
-version = "0.1.0"
+version = "0.2.0"
 description = "Memento-S Agent"
 requires-python = ">=3.12"
 dependencies = [
@@ -14,7 +14,7 @@ dependencies = [
     "openai",
     "litellm>=1.81.10",
     "mcp",
-    "tiktoken",
+    "tiktoken>=0.7.0,<0.12.0",
     "httpx",
     "beautifulsoup4",
     "markdownify",
@@ -23,19 +23,24 @@ dependencies = [
     "aiofiles",
     "anyio",
     "pyyaml",
+    "python-frontmatter>=1.0.0",
     "google_search_results",
     "crawl4ai",
     "camel-ai",
     "nltk",
     "jieba>=0.42.1",
     "rank-bm25",
-    "flet>=0.25.0",
+    "flet==0.82.0",
     "platformdirs>=4.0.0",
     "loguru>=0.7.0",
     "sqlalchemy>=2.0.0",
     "aiosqlite>=0.19.0",
     "sqlite-vec>=0.1.0",
     "alembic>=1.12.0",
+    "inflection>=0.5.1",
+    # IM Platform dependencies
+    "websockets>=12.0",
+    "lark-oapi>=1.0.0",
 ]
 
 
@@ -54,7 +59,7 @@ app.name            = "memento-s"
 app.product         = "Memento-S"
 app.org             = "com.yangtzeailab.memento-s"
 app.bundle_id       = "com.yangtzeailab.memento-s.app"
-app.build_version   = "0.1.0"
+app.build_version   = "0.2.0"
 app.build_number    = 1
 
 [tool.flet.app.macos]
@@ -66,7 +71,7 @@ entitlements  = { "com.apple.security.network.client" = true, "com.apple.securit
 [tool.briefcase]
 project_name = "Memento-S"
 bundle = "com.memento-s"
-version = "0.1.0"
+version = "0.2.0"
 
 [tool.briefcase.app.memento-s]
 formal_name = "Memento-S"
@@ -96,7 +101,7 @@ requires = [
     "python-dotenv",
     "watchdog",
     "mcp",
-    "tiktoken",
+    "tiktoken>=0.7.0,<0.12.0",
     "httpx",
     "beautifulsoup4",
     "markdownify",

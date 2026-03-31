@@ -1,17 +1,15 @@
 """Core managers for Memento-S.
 
-This module contains high-level managers that coordinate
-between different subsystems.
+此模块包含仅在 core/ 内部使用的管理器.
+Note: SessionManager 和 ConversationManager 已移动到 shared.chat.
 """
 
-from .conversation_manager import ConversationManager
-from .session_manager import SessionManager, generate_session_id
 from .session_context import ActionRecord, EnvironmentSnapshot, SessionContext
 
 __all__ = [
-    "SessionManager",
-    "generate_session_id",
-    "ConversationManager",
+    # Session 和 Conversation 管理器已移动到 shared.chat
+    # 请使用: from shared.chat import ChatManager
+    # 仅 core/ 内部使用的执行上下文
     "SessionContext",
     "EnvironmentSnapshot",
     "ActionRecord",

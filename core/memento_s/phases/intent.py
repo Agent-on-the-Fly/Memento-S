@@ -1,6 +1,12 @@
-"""Phase: Intent recognition — classify user intent and normalize to English task.
+"""Phase: Intent recognition — classify user intent as the *Comprehender* role.
 
-Owns IntentMode and IntentResult (co-located to avoid circular imports).
+Responsibilities:
+  - Understand what the user is saying
+  - Classify request type (DIRECT / AGENTIC / CONFIRM / INTERRUPT)
+  - Detect context shifts
+  - Surface ambiguity
+
+Does NOT: match skills, extract parameters, decide implementation details.
 """
 
 from __future__ import annotations
@@ -10,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from core.manager.session_context import RECENT_ACTIONS_INTENT
 from core.prompts.templates import INTENT_PROMPT
 from middleware.llm import LLMClient
 from utils.debug_logger import log_agent_phase
@@ -27,19 +34,23 @@ logger = get_logger(__name__)
 
 
 class IntentMode(str, Enum):
-    """Three-way intent classification."""
+    """Four-way intent classification."""
 
     DIRECT = "direct"
     AGENTIC = "agentic"
+    CONFIRM = "confirm"
     INTERRUPT = "interrupt"
 
 
 class IntentResult(BaseModel):
     """Output of the intent phase."""
 
-    mode: IntentMode = Field(description="direct / agentic / interrupt")
-    task: str = Field(description="Normalized complete English task description")
+    mode: IntentMode = Field(description="direct / agentic / confirm / interrupt")
+    task: str = Field(description="User's task in their original language")
+    task_summary: str = Field(default="", description="Short English summary for internal logging")
     intent_shifted: bool = Field(default=False)
+    ambiguity: str = Field(default="", description="Ambiguity description when mode=confirm")
+    clarification_question: str = Field(default="", description="Question to ask user when mode=confirm")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -60,17 +71,25 @@ def _build_session_context_block(session_context: Any, user_content: str) -> str
 
     action_history = getattr(session_context, "action_history", [])
     if action_history:
-        recent = action_history[-3:]
-        success_count = sum(1 for a in recent if getattr(a, "success", False))
+        recent = action_history[-RECENT_ACTIONS_INTENT:]
+        summaries: list[str] = []
+        for a in recent:
+            name = getattr(a, "skill_name", "") or getattr(a, "tool_name", "unknown")
+            ok = "OK" if getattr(a, "success", False) else "FAIL"
+            res = getattr(a, "result_summary", "")[:60]
+            summaries.append(f"{name}({ok}): {res}")
         lines.append(
-            f"- Actions so far: {len(action_history)} total, "
-            f"last {len(recent)} steps had {success_count} successes"
+            f"- Actions so far: {len(action_history)} total. "
+            f"Recent: {'; '.join(summaries)}"
         )
 
     has_plan = getattr(session_context, "has_active_plan", False)
     plan_count = getattr(session_context, "plan_step_count", 0)
     if plan_count:
-        lines.append(f"- Active task plan: {plan_count} steps defined")
+        # Try to get done count from statuses
+        statuses = getattr(session_context, "_plan_statuses", [])
+        done = sum(1 for s in statuses if str(s) == "done")
+        lines.append(f"- Active task plan: {done}/{plan_count} steps completed")
     lines.append(f"- Multi-step task running: {'YES' if has_plan else 'no'}")
 
     return "\n".join(lines) if lines else "- No active session context"
@@ -89,9 +108,10 @@ async def recognize_intent(
     session_context: Any = None,
     config: AgentConfig | None = None,
 ) -> IntentResult:
-    """Recognise user intent and normalise to an English task description.
+    """Recognise user intent. Preserves the user's original language in ``task``.
 
-    Returns an ``IntentResult`` with ``mode``, ``task`` and ``intent_shifted``.
+    Returns an ``IntentResult`` with ``mode``, ``task``, ``intent_shifted``,
+    and optionally ``ambiguity`` / ``clarification_question`` for CONFIRM mode.
     """
     cfg = config or AgentConfig()
     history_summary = context_manager.build_history_summary(

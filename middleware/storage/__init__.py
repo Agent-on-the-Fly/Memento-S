@@ -27,6 +27,7 @@ from middleware.storage.services import (
     SessionService,
     SkillService,
 )
+from middleware.storage.vector_storage import VectorStorage, SQLITE_VEC_AVAILABLE
 
 __all__ = [
     # Models
@@ -53,4 +54,7 @@ __all__ = [
     "SessionService",
     "ConversationService",
     "SkillService",
+    # Vector
+    "VectorStorage",
+    "SQLITE_VEC_AVAILABLE",
 ]

@@ -37,6 +37,15 @@
   "toolbar": {
     "new_conversation": "New Chat",
     "model_settings": "Model Settings",
+    "search_models": "Search models...",
+    "add_model": "Add Model",
+    "edit_model": "Edit Models",
+    "delete_model_tooltip": "Delete Model",
+    "finish_editing": "Finish Editing",
+    "no_matching_models": "No matching models found",
+    "cannot_delete_last_model": "Cannot delete the last model",
+    "model_deleted": "Model '{name}' deleted",
+    "delete_model_failed": "Failed to delete model: {error}",
     "tooltip": {
       "clear": "Clear chat (Ctrl+L)",
       "export": "Export conversation",
@@ -60,6 +69,7 @@
       "llm": "LLM",
       "skills": "Skills",
       "storage": "Storage",
+      "im": "IM",
       "advanced": "Advanced"
     },
     "fields": {
@@ -95,7 +105,18 @@
       "search": "Search",
       "skills": "Skills",
       "storage": "Storage",
-      "advanced": "Advanced"
+      "advanced": "Advanced",
+      "enabled": "Enabled",
+      "app_id": "App ID",
+      "app_secret": "App Secret",
+      "app_key": "App Key",
+      "corp_id": "Corp ID",
+      "agent_id": "Agent ID",
+      "secret": "Secret",
+      "encrypt_key": "Encrypt Key",
+      "verification_token": "Verification Token",
+      "webhook_url": "Webhook URL",
+      "platform": "Platform"
     },
     "theme_options": {
       "system": "System",
@@ -228,6 +249,8 @@
     "delete_conversation_msg": "Are you sure you want to delete this conversation? This action cannot be undone.",
     "delete_session_title": "Delete Session",
     "delete_session_msg": "Are you sure you want to delete this session? This action cannot be undone.",
+    "delete_model_title": "Confirm Delete",
+    "delete_model_msg": "Are you sure you want to delete model '{name}'?\nThis action cannot be undone.",
     "rename_conversation_title": "Rename Conversation",
     "rename_session_title": "Rename Session",
     "new_title_label": "New Title",
@@ -320,6 +343,9 @@
     "not_implemented": "Export feature not yet implemented"
   },
   "settings_panel": {
+    "account": "Account",
+    "not_logged_in": "Not logged in",
+    "login_hint": "Log in to sync your settings and data",
     "appearance": "Appearance",
     "language": "Language",
     "theme": "Theme",
@@ -359,8 +385,22 @@
       "llm": "LLM",
       "skills": "Skills",
       "storage": "Storage",
+      "im": "IM",
       "advanced": "Advanced",
       "raw": "Raw Config"
+    },
+    "im": {
+      "description": "Configure instant messaging platform integration, supports WeChat, Feishu, DingTalk, WeCom",
+      "gateway_title": "Gateway Configuration",
+      "gateway_enabled": "Enable Gateway",
+      "gateway_disabled_hint": "Please enable Gateway first to configure IM platforms",
+      "gateway_error_title": "Startup Failed",
+      "platforms": {
+        "wechat": "WeChat",
+        "feishu": "Feishu",
+        "dingtalk": "DingTalk",
+        "wecom": "WeCom"
+      }
     },
     "fields": {
       "model": "Model",
@@ -421,8 +461,12 @@
     "confirm": "Confirm"
   },
   "update": {
+    "available": "Update Available",
+    "new_version": "New version: {version}",
+    "current_version": "Current version: {version}",
     "downloading": "Downloading Update",
     "downloading_desc": "Downloading the latest version, please wait...",
+    "starting_download": "Starting download...",
     "cancelled": "Download cancelled",
     "ready_title": "Update Ready",
     "ready_desc": "Version {version} has been downloaded. Install now?",
@@ -433,11 +477,63 @@
     "restart_and_install": "Restart & Install",
     "installing": "Installing Update",
     "installing_desc": "Installing update, application will restart shortly...",
-    "install_complete": "Update installed successfully"
+    "install_complete": "Update installer launched, application will restart shortly",
+    "update_now": "Update Now",
+    "check_failed": "Failed to check for updates",
+    "check_failed_detail": "Failed to check updates: {error}",
+    "already_latest": "You are running the latest version",
+    "release_notes_label": "Release Notes: {notes}",
+    "update_hint": "A new version is available for {platform}. Click 'Update Now' to download and install automatically.",
+    "install_later_hint": "Update will be installed later",
+    "manager_not_initialized": "Update manager not initialized",
+    "install_failed": "Installation failed",
+    "download_failed": "Download failed",
+    "blocked_translocated": "The app is running in an isolated environment and cannot be updated. Move it to Applications and reopen it.",
+    "force_update_title": "Required Update",
+    "force_update_desc": "This is a required update. You must install it before continuing.",
+    "force_update_downloading": "Downloading required update, please wait...",
+    "download_now": "Download Now"
   },
   "common": {
     "cancel": "Cancel",
     "later": "Later",
     "close": "Close"
+  },
+  "auth": {
+    "login": "Login",
+    "click_to_login": "Click to login",
+    "account": "Account",
+    "account_hint": "Enter phone number / email",
+    "verification_code": "Verification Code",
+    "code_hint": "Enter verification code",
+    "send_code": "Send Code",
+    "code_sent": "Code sent",
+    "resend_after": "Resend in {seconds}s",
+    "logging_in": "Logging in...",
+    "login_success": "Login successful",
+    "login_failed": "Login failed: {error}",
+    "logged_in_as": "Logged in: {user}",
+    "send_code_failed": "Failed to send code: {error}",
+    "account_required": "Please enter account",
+    "code_required": "Please enter verification code",
+    "logout": "Sign Out",
+    "logout_success": "Signed out successfully",
+    "logout_failed": "Sign out failed: {error}"
+  },
+  "file_browser": {
+    "search_hint": "Search files...",
+    "workspace_not_exist": "Workspace does not exist",
+    "menu": {
+      "copy_path": "Copy Path",
+      "open_in_folder": "Open in Folder",
+      "delete": "Delete"
+    },
+    "dialog": {
+      "delete_title": "Confirm Delete",
+      "delete_content": "Are you sure you want to delete {name}?",
+      "cancel": "Cancel",
+      "confirm_delete": "Delete"
+    },
+    "tooltip": "File Browser"
   }
 }

@@ -1,0 +1,84 @@
+# Local env / secrets
+.env
+.env.*
+!.env.example
+.claude
+# Codex / agent runtime
+.agent/
+runs/
+
+# GAIA dataset / attachments (large)
+GAIA_data/
+
+# GAIA evaluation script & outputs
+eval_gaia.py
+gaia_eval.log
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+.pytype/
+
+# Python packaging / builds
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Virtualenvs / conda
+.venv/
+venv/
+env/
+.conda/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+log/
+
+# OS / editor
+.DS_Store
+__MACOSX
+Thumbs.db
+.idea/
+.vscode/
+.trae/
+
+# Local npm artifacts (not tracked in this repo)
+node_modules/
+package.json
+package-lock.json
+uv.lock
+
+workspace/*
+data/*
+
+# Verification pipeline
+.verify_cache/
+results/*
+.cursor/
+router_data/.cloud_chroma/
+.idea/
+
+resources/
+*.spec
+
+# Local baoyu skills (not tracked)
+builtin/skills/baoyu-*
+.flake8

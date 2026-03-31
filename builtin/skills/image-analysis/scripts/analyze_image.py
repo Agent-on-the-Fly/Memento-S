@@ -32,12 +32,16 @@ def _load_llm_config() -> dict[str, Any]:
     """Load model/API config from the project's configuration."""
     try:
         from middleware.config.config_manager import ConfigManager
+
         config = ConfigManager().load()
         profile = config.llm.current_profile
+        if profile is None:
+            return {}
         return {
-            "model": profile.model,
+            "model": profile.model or "",
             "api_key": profile.api_key,
             "base_url": profile.base_url,
+            "litellm_provider": getattr(profile, "litellm_provider", ""),
             "max_tokens": profile.max_tokens,
             "timeout": profile.timeout,
             "extra_headers": profile.extra_headers,
@@ -46,17 +50,51 @@ def _load_llm_config() -> dict[str, Any]:
         return {}
 
 
-def _build_model_string(model: str, base_url: str | None = None) -> str:
-    """Build litellm model string with provider prefix."""
-    if "/" in model:
-        return model
+def _is_known_model(model: str) -> bool:
+    """Check if litellm recognises the model (can auto-route)."""
+    try:
+        import litellm
+
+        litellm.get_model_info(model)
+        return True
+    except Exception:
+        return False
+
+
+def _build_model_string(
+    model: str,
+    base_url: str | None = None,
+    litellm_provider: str = "",
+) -> str:
+    """Build litellm model string with provider prefix.
+
+    Logic mirrors LLMClient._build_model_string() — keep in sync.
+
+    Three-layer strategy:
+    1. Explicit litellm_provider → "{provider}/{model}"
+    2. Proxy URL detection (openrouter) → add proxy prefix
+    3. litellm-known model → pass as-is
+    4. Unknown model + base_url → "openai/{model}" (universal fallback)
+    5. No base_url → pass as-is
+    """
+    if litellm_provider:
+        return f"{litellm_provider}/{model}"
+
     if base_url:
-        if "anthropic" in base_url:
-            return f"anthropic/{model}"
-        elif "openrouter" in base_url:
-            return f"openrouter/{model}"
-        elif "openai" in base_url:
+        url = base_url.lower()
+        if "openrouter" in url:
+            if not model.startswith("openrouter/"):
+                return f"openrouter/{model}"
+            return model
+
+    if _is_known_model(model):
+        return model
+
+    if base_url:
+        if "/" not in model:
             return f"openai/{model}"
+        return model
+
     return model
 
 
@@ -130,22 +168,33 @@ def analyze_image(
     # Load project config
     config = _load_llm_config()
     if not config and not model:
-        print("WARNING: No LLM config found. Falling back to basic mode.", file=sys.stderr)
+        print(
+            "WARNING: No LLM config found. Falling back to basic mode.", file=sys.stderr
+        )
         return analyze_image_basic(image_path)
 
     selected_model = model or config.get("model", "")
     if not selected_model:
-        print("WARNING: No model configured. Falling back to basic mode.", file=sys.stderr)
+        print(
+            "WARNING: No model configured. Falling back to basic mode.", file=sys.stderr
+        )
         return analyze_image_basic(image_path)
 
-    model_str = _build_model_string(selected_model, config.get("base_url"))
+    model_str = _build_model_string(
+        selected_model,
+        config.get("base_url"),
+        config.get("litellm_provider", ""),
+    )
     image_url = _image_to_data_url(image_path)
 
     messages = [
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": prompt.strip() or "Describe this image in detail."},
+                {
+                    "type": "text",
+                    "text": prompt.strip() or "Describe this image in detail.",
+                },
                 {"type": "image_url", "image_url": {"url": image_url}},
             ],
         }
@@ -179,11 +228,21 @@ def analyze_image(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyze a local image.")
     parser.add_argument("--image", required=True, help="Path to local image")
-    parser.add_argument("--prompt", default="Describe this image in detail.", help="Question or instruction")
+    parser.add_argument(
+        "--prompt",
+        default="Describe this image in detail.",
+        help="Question or instruction",
+    )
     parser.add_argument("--model", default="", help="Override model id")
-    parser.add_argument("--max-tokens", type=int, default=2048, help="Max output tokens")
-    parser.add_argument("--timeout", type=int, default=60, help="HTTP timeout in seconds")
-    parser.add_argument("--basic", action="store_true", help="Basic mode: metadata only, no LLM")
+    parser.add_argument(
+        "--max-tokens", type=int, default=2048, help="Max output tokens"
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=60, help="HTTP timeout in seconds"
+    )
+    parser.add_argument(
+        "--basic", action="store_true", help="Basic mode: metadata only, no LLM"
+    )
     args = parser.parse_args()
 
     image_path = Path(args.image).expanduser()

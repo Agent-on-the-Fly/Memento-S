@@ -14,33 +14,46 @@ Features:
 from __future__ import annotations
 
 import asyncio
-import logging
+import platform
+import sys
+import warnings
+from pathlib import Path
 from typing import Optional
 
 import flet as ft
 
+# 抑制无害的 Lark SDK 警告
+warnings.filterwarnings(
+    "ignore",
+    message=".*Task exception was never retrieved.*",
+    category=RuntimeWarning,
+)
+
 from bootstrap import bootstrap_sync
+from shared.chat import ChatManager
 
 # Core imports
 from core.memento_s import MementoSAgent
-from core.manager import SessionManager
-from middleware.config import g_config
-from middleware.llm import LLMClient
-from core.skill.gateway import SkillGateway
-from utils.logger import logger
+from core.skill import SkillGateway
+from gui.i18n import t
+from gui.modules.auth_service import AuthService
+from gui.modules.command_controller import CommandController
+from gui.modules.conversation_controller import ConversationController
+from gui.modules.input_controller import InputController
+from gui.modules.keyboard_controller import KeyboardController
+from gui.modules.layout import AppLayoutBuilder
+from gui.modules.main_layout import MainLayout
+from gui.modules.message_controller import MessageController
+from gui.modules.settings_panel import SettingsPanel
+from gui.modules.ui_feedback_controller import UIFeedbackController
+from gui.modules.update_notifier import UpdateNotifier
+from gui.modules.auto_update_manager import AutoUpdateManager
 
 # GUI imports
 from gui.widgets.sidebar import SessionSidebar
-from gui.modules.layout import AppLayoutBuilder
-from gui.modules.settings_panel import SettingsPanel
-from gui.modules.conversation_controller import ConversationController
-from gui.modules.keyboard_controller import KeyboardController
-from gui.modules.input_controller import InputController
-from gui.modules.message_controller import MessageController
-from gui.modules.command_controller import CommandController
-from gui.modules.ui_feedback_controller import UIFeedbackController
-from gui.modules.update_notifier import UpdateNotifier
-from gui.i18n import t
+from middleware.config import g_config
+from middleware.llm import LLMClient
+from utils.logger import logger
 
 
 class MementoSGUIImproved:
@@ -77,7 +90,6 @@ class MementoSGUIImproved:
         # Core components
         self._llm: Optional[LLM] = None
         self._skill_gateway: Optional[SkillGateway] = None
-        self._session_manager: Optional[SessionManager] = None
         self._agent: Optional[MementoSAgent] = None
 
         # Session & Conversation management
@@ -100,7 +112,9 @@ class MementoSGUIImproved:
         self._flet_process_ids: list[int] = []
 
         # Components (initialized in build)
-        self.sidebar: Optional[SessionSidebar] = None
+        self.sidebar: Optional[ft.Container] = None
+        self.session_sidebar: Optional[SessionSidebar] = None
+        self.user_info_bar = None
         self.chat_list: Optional[ft.ListView] = None
         self.message_input: Optional[ft.TextField] = None
         self.loading_indicator: Optional[ft.ProgressRing] = None
@@ -115,12 +129,118 @@ class MementoSGUIImproved:
         self.message_controller = MessageController(self, logger)
         self.command_controller = CommandController(self)
         self.ui_feedback_controller = UIFeedbackController(self)
+        self.update_manager: Optional[AutoUpdateManager] = None
         self.update_notifier: Optional[UpdateNotifier] = None
+        self.auth_service = AuthService()
+        self._login_dialog = None
 
         # 注册语言切换观察者
         from gui.i18n import add_observer
 
         add_observer(self._on_language_changed)
+
+        # 订阅 IM 事件（显示 Toast 通知）
+        self._setup_im_event_handlers()
+
+        # 订阅 401 认证失效事件
+        self._setup_auth_event_handlers()
+
+    def _setup_auth_event_handlers(self):
+        """订阅 AUTH_REQUIRED 事件，API 返回 401 时清空 token 并弹出登录框。"""
+        try:
+            from utils.event_bus import event_bus, EventType
+
+            def on_auth_required(event):
+                try:
+                    self.auth_service.clear_token()
+                    if self.user_info_bar:
+                        self.user_info_bar.update_user_area(
+                            logged_in=False, display_name=""
+                        )
+                    if self.layout_builder:
+                        self.layout_builder.update_sidebar_user_state(
+                            logged_in=False, display_name=""
+                        )
+                    if self.page:
+                        self._show_login_dialog_for_401()
+                except Exception as e:
+                    logger.warning(f"[App] Error handling AUTH_REQUIRED: {e}")
+
+            event_bus.subscribe(EventType.AUTH_REQUIRED, on_auth_required)
+            logger.info("[App] AUTH_REQUIRED event handler registered")
+        except Exception as e:
+            logger.warning(f"[App] Failed to setup auth event handlers: {e}")
+
+    def _show_login_dialog_for_401(self):
+        """在主线程安全地弹出登录框（供事件回调调用）。"""
+        if not self.page:
+            return
+
+        def _open():
+            try:
+                self._ensure_login_dialog()
+                self._login_dialog.show()
+            except Exception as e:
+                logger.warning(f"[App] Failed to show login dialog for 401: {e}")
+
+        try:
+            self.page.call_later(0, _open)
+        except Exception:
+            _open()
+
+    def _setup_im_event_handlers(self):
+        """设置 IM 事件处理器"""
+        try:
+            from utils.event_bus import event_bus, EventType
+
+            def on_im_event(event):
+                """处理 IM 事件"""
+                try:
+                    data = event.data or {}
+                    platform = data.get("platform", data.get("platform_id", "未知平台"))
+                    error = data.get("error")
+
+                    if event.type == EventType.IM_SERVICE_STARTED:
+                        self._show_snackbar(f"✓ {platform} 服务已启动")
+                    elif event.type == EventType.IM_SERVICE_STOPPED:
+                        self._show_snackbar(f"✓ {platform} 服务已停止")
+                    elif event.type == EventType.IM_SERVICE_START_FAILED:
+                        msg = f"✗ {platform} 启动失败"
+                        if error:
+                            msg += f": {error[:50]}"
+                        self._show_error(msg)
+
+                        # 检查是否需要重新登录（微信 session 过期）
+                        # 同时更新设置面板中的微信登录状态
+                        if self.settings_panel:
+                            self.settings_panel.set_wechat_session_expired(True)
+                            logger.info(
+                                "[App] Updated settings panel wechat status to expired"
+                            )
+                        if data.get("event_type") == "session_expired" and data.get(
+                            "requires_relogin"
+                        ):
+                            logger.info(
+                                "[App] WeChat session expired, showing login dialog"
+                            )
+                            self._show_wechat_login_dialog(is_relogin=True)
+                    elif event.type == EventType.IM_SERVICE_STOP_FAILED:
+                        msg = f"✗ {platform} 停止失败"
+                        if error:
+                            msg += f": {error[:50]}"
+                        self._show_error(msg)
+                except Exception as e:
+                    logger.warning(f"[App] Error handling IM event: {e}")
+
+            # 订阅所有 IM 相关事件
+            event_bus.subscribe(EventType.IM_SERVICE_STARTED, on_im_event)
+            event_bus.subscribe(EventType.IM_SERVICE_STOPPED, on_im_event)
+            event_bus.subscribe(EventType.IM_SERVICE_START_FAILED, on_im_event)
+            event_bus.subscribe(EventType.IM_SERVICE_STOP_FAILED, on_im_event)
+
+            logger.info("[App] IM event handlers registered")
+        except Exception as e:
+            logger.warning(f"[App] Failed to setup IM event handlers: {e}")
 
     def _on_language_changed(self, new_lang: str):
         """语言切换时的回调 - 刷新所有 UI 文本"""
@@ -183,45 +303,34 @@ class MementoSGUIImproved:
                 logger.error(f"[INIT] Traceback:\n{traceback.format_exc()}")
                 raise
 
-            # Create skill gateway (bootstrap has already done skill sync)
+            # Create skill gateway
             logger.info("[INIT] Step 4: Creating skill gateway...")
             self._set_startup_status("Loading skill system...")
             try:
-                from core.skill.gateway import create_gateway
-
-                self._skill_gateway = await create_gateway()
+                self._skill_gateway = await SkillGateway.from_config()
                 logger.info("[INIT] Skill gateway created successfully")
             except Exception as e:
-                logger.warning(f"[INIT] Failed to create skill gateway: {e}")
+                logger.warning(f"[INIT] Failed to create skill provider: {e}")
                 self._skill_gateway = None
 
-            manifests = self._skill_gateway.discover()
+            if self._skill_gateway is None:
+                manifests = []
+                logger.warning(
+                    "[INIT] Skill gateway unavailable, continue with no skills"
+                )
+            else:
+                manifests = await self._skill_gateway.discover()
             skill_count = len(manifests)
             logger.info(f"[INIT] Skills loaded: {skill_count} skills")
             skill_names = [m.name for m in manifests]
             logger.info(f"[INIT] Skill names: {skill_names}")
             self._set_startup_status(f"✓ Skill system ready ({skill_count} skills)")
 
-            # Initialize session manager
-            logger.info("[INIT] Step 5: Initializing session manager...")
-            try:
-                self._session_manager = SessionManager()
-                logger.info("[INIT] Session manager initialized successfully")
-            except Exception as session_error:
-                import traceback
-
-                logger.error(
-                    f"[INIT] Failed to initialize session manager: {session_error}"
-                )
-                logger.error(f"[INIT] Traceback:\n{traceback.format_exc()}")
-                raise
-
             # Initialize agent
             logger.info("[INIT] Step 6: Initializing MementoSAgent...")
             try:
                 self._agent = MementoSAgent(
                     skill_gateway=self._skill_gateway,
-                    session_manager=self._session_manager,
                 )
                 logger.info("[INIT] MementoSAgent initialized successfully")
             except Exception as agent_error:
@@ -253,11 +362,14 @@ class MementoSGUIImproved:
             self._hide_startup_overlay()
             logger.info("[INIT] GUI initialized successfully!")
 
-            # 9) Initialize auto-update notifier
+            # 9) Initialize auto-update
             logger.info("[INIT] Step 9: Initializing auto-update...")
             try:
+                self.update_manager = AutoUpdateManager()
+                self.update_manager.log_runtime_environment_info()
                 notifier = UpdateNotifier(
                     page=self.page,
+                    manager=self.update_manager,
                     show_error=self._show_error,
                     show_snackbar=self._show_snackbar,
                 )
@@ -287,6 +399,7 @@ class MementoSGUIImproved:
         try:
             # Flet 0.21.0 及以上版本的新 API (page.window)
             self.page.window.prevent_close = True
+            self._apply_window_icon()
 
             # 保底：也绑定综合事件 (防止部分 0.21.x 版本遗漏)
             self.page.window.on_event = self._on_window_event
@@ -309,15 +422,14 @@ class MementoSGUIImproved:
         # Record Flet child process IDs for clean exit
         self._record_flet_processes()
 
-        base_layout = ft.Row(
-            [
-                self.sidebar,
-                ft.VerticalDivider(width=1, color=ft.Colors.GREY_800),
-                self.main_area,
-            ],
-            expand=True,
-            spacing=0,
+        # Create main layout with file browser support
+        self.main_layout = MainLayout(
+            page=self.page,
+            sidebar=self.sidebar,
+            main_area=self.main_area,
+            workspace_path=g_config.get_workspace_dir(),
         )
+        base_layout = self.main_layout.get_layout()
 
         # Startup waiting overlay (visible immediately)
         self.startup_overlay = ft.Container(
@@ -363,9 +475,129 @@ class MementoSGUIImproved:
         # Initialize
         asyncio.create_task(self.initialize())
 
+    def _apply_window_icon(self):
+        """Apply runtime icon to the native desktop window on Windows."""
+        if platform.system() != "Windows" or not self.page:
+            return
+
+        icon_path = self._resolve_window_icon_path()
+        if not icon_path:
+            logger.warning("[App] Window icon not found, skipping runtime icon setup")
+            return
+
+        try:
+            self.page.window.icon = str(icon_path)
+            logger.info(f"[App] Applied runtime window icon: {icon_path}")
+        except Exception as e:
+            logger.warning(f"[App] Failed to apply runtime window icon: {e}")
+
+    def _get_runtime_icon_name(self) -> str:
+        """Return the platform-specific desktop icon filename."""
+        system = platform.system()
+        if system == "Windows":
+            return "icon.ico"
+        if system == "Darwin":
+            return "icon.icns"
+        return "icon.png"
+
+    def _resolve_window_icon_path(self) -> Path | None:
+        """Resolve the platform-specific icon for both source and packaged runtimes."""
+        candidates: list[Path] = []
+        icon_name = self._get_runtime_icon_name()
+
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            candidates.append(Path(meipass) / "assets" / icon_name)
+
+        executable = getattr(sys, "executable", None)
+        if executable:
+            candidates.append(Path(executable).resolve().parent / "assets" / icon_name)
+
+        candidates.append(Path(__file__).resolve().parents[1] / "assets" / icon_name)
+
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+
+        return None
+
     def _create_sidebar(self):
-        """Create sidebar"""
+        """Create and initialize sidebar components."""
         self.layout_builder.create_sidebar()
+        # Restore login state if previously logged in
+        if self.auth_service.is_logged_in:
+            self.user_info_bar.update_user_area(
+                logged_in=True,
+                display_name=self.auth_service.display_name,
+            )
+            self.layout_builder.update_sidebar_user_state(
+                logged_in=True,
+                display_name=self.auth_service.display_name,
+            )
+
+    def _ensure_login_dialog(self):
+        """Lazily create (or recreate) the shared LoginDialog instance."""
+        from gui.widgets.login_dialog import LoginDialog
+
+        if self._login_dialog is None or self._login_dialog.page is not self.page:
+            self._login_dialog = LoginDialog(
+                page=self.page,
+                auth_service=self.auth_service,
+                on_login_success=self._on_login_success,
+            )
+
+    def _on_login_click(self):
+        """Handle login button click in sidebar."""
+        self._ensure_login_dialog()
+        self._login_dialog.show()
+
+    def _on_login_success(self):
+        """Handle successful login."""
+        self.user_info_bar.update_user_area(
+            logged_in=True,
+            display_name=self.auth_service.display_name,
+        )
+        self.layout_builder.update_sidebar_user_state(
+            logged_in=True,
+            display_name=self.auth_service.display_name,
+        )
+        self._show_snackbar(t("auth.login_success"))
+        self._refresh_settings_panel_if_open()
+
+    def _on_logout_click(self):
+        """Handle logout button click in sidebar."""
+        asyncio.create_task(self._do_logout())
+
+    async def _do_logout(self):
+        """Call logout API and reset UI state."""
+        try:
+            success, msg = await self.auth_service.logout()
+        except Exception as e:
+            logger.warning(f"[App] Logout error: {e}")
+            success = False
+            msg = str(e)
+
+        if success:
+            self.user_info_bar.update_user_area(logged_in=False, display_name="")
+            self.layout_builder.update_sidebar_user_state(
+                logged_in=False, display_name=""
+            )
+            self._show_snackbar(t("auth.logout_success"))
+            self._refresh_settings_panel_if_open()
+        else:
+            self._show_snackbar(t("auth.logout_failed", error=msg or ""))
+
+    def _refresh_settings_panel_if_open(self):
+        """Refresh the settings panel content if it is currently open."""
+        try:
+            if (
+                self.settings_panel
+                and self.settings_panel.dialog
+                and self.settings_panel.dialog.open
+            ):
+                self.settings_panel._refresh_content()
+        except Exception:
+            pass
 
     def _create_main_area(self):
         """Create main chat area"""
@@ -398,7 +630,9 @@ class MementoSGUIImproved:
         logger.info("[App] Exit requested, starting async shutdown...")
 
         # 启动异步退出流程（给 Flet 时间发送 update 指令）
-        asyncio.create_task(self._async_exit())
+        task = asyncio.create_task(self._async_exit())
+        # 添加回调以避免 "Task exception was never retrieved" 警告
+        task.add_done_callback(lambda t: None)
 
     async def _async_exit(self):
         """异步退出：先让子进程自己退出，避免窗口闪烁"""
@@ -667,9 +901,9 @@ class MementoSGUIImproved:
         """Load most recent session on startup"""
         return await self.conversation_controller.load_most_recent_session()
 
-    async def _generate_conversation_title(self):
+    async def _generate_conversation_title(self, content: str = None):
         """Generate title using LLM"""
-        await self.conversation_controller.generate_conversation_title()
+        await self.conversation_controller.generate_conversation_title(content)
 
     def _get_current_model(self) -> str:
         """Get current LLM model name"""
@@ -679,9 +913,9 @@ class MementoSGUIImproved:
 
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count for mixed language text."""
-        from utils.token_utils import estimate_tokens
+        from utils.token_utils import count_tokens
 
-        return estimate_tokens(text)
+        return count_tokens(text)
 
     # ========== Command Handling ==========
 
@@ -767,8 +1001,6 @@ class MementoSGUIImproved:
             # 更新状态栏显示
             self._update_toolbar_title()
 
-            self._show_snackbar(t("settings.model_changed", model=profile_name))
-
         except Exception as e:
             logger.error(f"[App] Error handling model change: {e}")
             self._show_error(t("settings.model_change_failed", error=str(e)))
@@ -780,6 +1012,10 @@ class MementoSGUIImproved:
             show_error=self._show_error,
             show_snackbar=self._show_snackbar,
             on_save_callback=self._on_settings_saved,
+            update_manager=self.update_manager,
+            auth_service=self.auth_service,
+            on_login_click=self._on_login_click,
+            on_logout_click=self._on_logout_click,
         )
         self.settings_panel.show()
 
@@ -794,6 +1030,10 @@ class MementoSGUIImproved:
             show_error=self._show_error,
             show_snackbar=self._show_snackbar,
             on_save_callback=self._on_settings_saved,
+            update_manager=self.update_manager,
+            auth_service=self.auth_service,
+            on_login_click=self._on_login_click,
+            on_logout_click=self._on_logout_click,
         )
         self.settings_panel.show(default_category=category)
 
@@ -823,13 +1063,107 @@ class MementoSGUIImproved:
         """Export conversation"""
         self._add_system_message(t("status.export_not_implemented"))
 
+    def _on_markket(self):
+        """Open Markket dialog"""
+        from gui.widgets.market_dialog import MarkketDialog
+
+        dialog = MarkketDialog(self)
+        dialog.show()
+
     def _show_error(self, message: str):
         """Show error"""
         self.ui_feedback_controller.show_error(message)
 
-    def _show_snackbar(self, message: str):
-        """Show snackbar"""
-        self.ui_feedback_controller.show_snackbar(message)
+    def _show_snackbar(self, message: str, type: str = "info", duration: int = 3000):
+        """显示 Toast 提示
+
+        Args:
+            message: 提示消息
+            type: 消息类型 - "info"/"warning"/"error"，默认 "info"
+            duration: 显示时长（毫秒），默认 3000ms（3秒）
+        """
+        self.ui_feedback_controller.show_snackbar(message, type=type, duration=duration)
+
+    def _show_wechat_login_dialog(self, is_relogin: bool = False):
+        """显示微信登录对话框
+
+        Args:
+            is_relogin: 是否为重新登录
+        """
+        try:
+            from gui.widgets.wechat_login_dialog import WechatLoginDialog
+            from middleware.config import g_config
+            from middleware.im.gateway_starter import get_gateway_manager
+
+            def on_success(token: str):
+                logger.info("[App] WeChat login successful, saving token")
+                try:
+                    # 保存 token
+                    g_config.set("im.wechat.token", token, save=True)
+
+                    # 重新启动微信渠道（需要先停止再启动，确保适配器重新初始化）
+                    gateway_mgr = get_gateway_manager()
+                    if gateway_mgr and gateway_mgr.is_running:
+                        logger.info("[App] Restarting WeChat channel after login")
+
+                        # 在后台线程中异步重启，不阻塞 UI
+                        import threading
+
+                        def restart_channel():
+                            try:
+                                # 先禁用微信渠道，触发停止
+                                g_config.set("im.wechat.enabled", False, save=True)
+                                gateway_mgr.refresh_channels_sync()
+                                logger.info("[App] WeChat channel stopped")
+
+                                # 等待确保停止完成
+                                import time
+
+                                time.sleep(1)
+
+                                # 再启用微信渠道，触发启动（使用新 token）
+                                g_config.set("im.wechat.enabled", True, save=True)
+                                gateway_mgr.refresh_channels_sync()
+                                logger.info("[App] WeChat channel restarted")
+                            except Exception as e:
+                                logger.error(
+                                    f"[App] Failed to restart WeChat channel: {e}"
+                                )
+
+                        threading.Thread(target=restart_channel, daemon=True).start()
+
+                    # 重置微信会话过期状态
+                    if self.settings_panel:
+                        self.settings_panel.set_wechat_session_expired(False)
+                        logger.info(
+                            "[App] Reset wechat session expired status after successful login"
+                        )
+
+                    self._show_snackbar("微信登录成功！渠道正在重启...")
+                except Exception as e:
+                    logger.error(f"[App] Failed to save WeChat token: {e}")
+                    self._show_error(f"保存Token失败: {e}")
+
+            def on_failed(error: str):
+                logger.error(f"[App] WeChat login failed: {error}")
+                self._show_error(f"微信登录失败: {error}")
+
+            dialog = WechatLoginDialog(
+                page=self.page,
+                on_login_success=on_success,
+                on_login_failed=on_failed,
+                is_relogin=is_relogin,
+            )
+            dialog.show()
+
+        except Exception as e:
+            logger.error(f"[App] Failed to show WeChat login dialog: {e}")
+            self._show_error(f"无法显示登录对话框: {e}")
+
+    def _toggle_file_browser(self):
+        """Toggle file browser drawer visibility"""
+        if hasattr(self, "main_layout"):
+            self.main_layout.toggle_file_browser()
 
 
 def main():
@@ -848,11 +1182,15 @@ def main():
     setup_logger(log_file="gui", enable_console=True)
 
     gui = MementoSGUIImproved()
+    icon_path = gui._resolve_window_icon_path()
 
     def on_page_init(page: ft.Page):
         gui.build(page)
 
-    ft.app(target=on_page_init)
+    ft.run(
+        main=on_page_init,
+        assets_dir=str(icon_path.parent) if icon_path else "assets",
+    )
 
 
 if __name__ == "__main__":

@@ -6,7 +6,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncGenerator, Literal, Optional
+from typing import Any, AsyncGenerator, Final, Literal, Optional
+
+
+FINISH_STOP: Final[str] = "stop"
+FINISH_TOOL_CALLS: Final[str] = "tool_calls"
+FINISH_LENGTH: Final[str] = "length"
+FINISH_CONTENT_FILTER: Final[str] = "content_filter"
 
 
 class ContentType(Enum):

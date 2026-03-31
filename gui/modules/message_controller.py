@@ -6,16 +6,17 @@ import asyncio
 from datetime import datetime
 from typing import Any
 
-from core.memento_s.stream_output import (
+from core.protocol import (
     AGUIEventPipeline,
     AGUIEventType,
     PersistenceSink,
     RunAccumulator,
 )
+
 from gui.modules.message_renderer import MessageRenderer
 from gui.widgets.chat_message import ChatMessage
 from gui.i18n import t
-from utils.token_utils import count_tokens_messages
+from middleware.config import g_config
 
 
 class MessageController:
@@ -24,16 +25,6 @@ class MessageController:
     def __init__(self, app, logger):
         self.app = app
         self.logger = logger
-
-    def _update_tokens_display(self):
-        """Calculate and update token display using accurate token counting."""
-        try:
-            total = count_tokens_messages(self.app.messages)
-            self.app.total_tokens = total
-            self.app._update_token_display(total)
-            self.logger.debug(f"[MSG] Updated token display: {total} tokens")
-        except Exception as e:
-            self.logger.warning(f"[MSG] Failed to update token display: {e}")
 
     async def send_current_message(self):
         if self.app.is_processing:
@@ -79,10 +70,14 @@ class MessageController:
 
             self.logger.info(f"[MSG] Created user conversation: 2")
 
-            self._update_tokens_display()
-
             self.app.page.update()
             await self.app.chat_list.scroll_to(offset=-1, duration=300)
+
+            # Generate title based on first user message (async, non-blocking)
+            if len(self.app.messages) == 1:
+                asyncio.create_task(
+                    self.app.conversation_controller.generate_conversation_title(text)
+                )
 
             self.app._current_task = asyncio.create_task(
                 self.process_message(text, user_conv["id"])
@@ -95,9 +90,6 @@ class MessageController:
             finally:
                 self.app._current_task = None
                 self.app.is_processing = False
-
-            if len(self.app.messages) >= 2:
-                await self.app._generate_conversation_title()
 
         except Exception as e:
             self.logger.error(f"[MSG] Error sending message: {e}")
@@ -114,6 +106,7 @@ class MessageController:
         renderer = MessageRenderer(self.app, self.logger, flush_interval=0.1)
         run_accumulator: RunAccumulator | None = None
         ai_conv_id = None
+        intent_mode: str = ""
 
         try:
             if not self.app._agent or not self.app.current_session_id:
@@ -122,6 +115,11 @@ class MessageController:
             renderer.start(text)
             start_time = datetime.now()
             step_count = 0
+
+            # Get model name from config
+            model_name = ""
+            if g_config and g_config.llm and g_config.llm.current:
+                model_name = g_config.llm.current.model
 
             async def _persist_assistant_output(
                 content: str, usage: dict[str, Any] | None
@@ -134,25 +132,49 @@ class MessageController:
                 duration = (datetime.now() - start_time).total_seconds()
                 tokens = usage.get("total_tokens") if usage else None
 
-                ai_conv = await self.app.conversation_controller.create_assistant_conversation(
-                    content=content,
-                    reply_to=user_conv_id,
-                    steps=step_count,
-                    duration_seconds=duration,
-                    tokens=tokens,
-                )
-                ai_conv_id = ai_conv["id"]
-                self.app.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": content,
-                        "conversation_id": ai_conv_id,
-                        "reply_to": user_conv_id,
-                        "timestamp": datetime.now().isoformat(),
-                        "steps": step_count,
-                        "duration_seconds": duration,
-                    }
-                )
+                if ai_conv_id:
+                    # Update existing conversation with new content
+                    await (
+                        self.app.conversation_controller.update_assistant_conversation(
+                            conversation_id=ai_conv_id,
+                            content=content,
+                            steps=step_count,
+                            duration_seconds=duration,
+                            tokens=tokens,
+                            model_name=model_name,
+                        )
+                    )
+                    # Update in-memory message
+                    for msg in self.app.messages:
+                        if msg.get("conversation_id") == ai_conv_id:
+                            msg["content"] = content
+                            msg["steps"] = step_count
+                            msg["duration_seconds"] = duration
+                            msg["model_name"] = model_name
+                            break
+                else:
+                    # Create new conversation
+                    ai_conv = await self.app.conversation_controller.create_assistant_conversation(
+                        content=content,
+                        reply_to=user_conv_id,
+                        steps=step_count,
+                        duration_seconds=duration,
+                        tokens=tokens,
+                        model_name=model_name,
+                    )
+                    ai_conv_id = ai_conv["id"]
+                    self.app.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": content,
+                            "conversation_id": ai_conv_id,
+                            "reply_to": user_conv_id,
+                            "timestamp": datetime.now().isoformat(),
+                            "steps": step_count,
+                            "duration_seconds": duration,
+                            "model_name": model_name,
+                        }
+                    )
 
             pipeline = AGUIEventPipeline()
             pipeline.add_sink(PersistenceSink(callback=_persist_assistant_output))
@@ -181,11 +203,15 @@ class MessageController:
                 if run_accumulator is not None:
                     run_accumulator.consume(event)
 
-                if event_type == AGUIEventType.STEP_STARTED:
+                if event_type == AGUIEventType.INTENT_RECOGNIZED:
+                    intent_mode = event.get("mode", "")
+
+                elif event_type == AGUIEventType.STEP_STARTED:
                     step = int(event.get("step", 0))
-                    step_count = max(step_count, step)  # Track max step count
-                    renderer.on_step_started(step)
-                    self.app._set_status(t("status.thinking_step", step=step))
+                    step_count = max(step_count, step)
+                    if intent_mode not in ("direct", "interrupt"):
+                        renderer.on_step_started(step)
+                        self.app._set_status(t("status.thinking_step", step=step))
 
                 elif event_type == AGUIEventType.TEXT_MESSAGE_CONTENT:
                     renderer.on_text_delta(event.get("delta", ""))
@@ -213,7 +239,8 @@ class MessageController:
                 elif event_type == AGUIEventType.STEP_FINISHED:
                     step = int(event.get("step", 0))
                     status = event.get("status", "unknown")
-                    renderer.on_step_finished(step, status)
+                    if intent_mode not in ("direct", "interrupt"):
+                        renderer.on_step_finished(step, status)
 
                 elif event_type == AGUIEventType.RUN_FINISHED:
                     reason = event.get("reason", "")
@@ -266,6 +293,7 @@ class MessageController:
                         max_width=max_width,
                         steps=step_count,
                         duration_seconds=total_duration,
+                        model_name=model_name,
                     )
                     self.app.chat_list.controls[msg_row_index] = formatted_msg
                     self.app.page.update()

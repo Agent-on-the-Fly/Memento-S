@@ -119,6 +119,41 @@ class DatabaseManager:
         if self._engine is not None:
             await self._engine.dispose()
 
+    @classmethod
+    async def from_config(
+        cls,
+        db_url: str | None = None,
+        echo: bool = False,
+    ) -> "DatabaseManager":
+        """Get singleton instance and initialize if needed.
+
+        This is the recommended way to get DatabaseManager in application code.
+        It ensures the instance is properly initialized before returning.
+
+        Args:
+            db_url: Database URL. If None, uses global config.
+            echo: Whether to echo SQL statements
+
+        Returns:
+            Initialized DatabaseManager instance
+
+        Example:
+            db_manager = await DatabaseManager.from_config()
+            # Now safe to use db_manager.engine and db_manager.session_factory
+        """
+        instance = cls.instance()
+
+        if not instance._initialized:
+            if db_url is None:
+                # Lazy import to avoid circular dependency
+                from middleware.config import g_config
+
+                db_url = g_config.get_db_url()
+
+            await instance.init(db_url=db_url, echo=echo)
+
+        return instance
+
 
 def get_db_manager() -> DatabaseManager:
     return DatabaseManager.instance()

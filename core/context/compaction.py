@@ -8,20 +8,35 @@
 """
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from utils.logger import get_logger
 from utils.token_utils import count_tokens, count_tokens_messages
-from middleware.llm.utils import chat_completions_async
+from middleware.llm.llm_client import chat_completions_async
 from core.prompts.templates import SUMMARIZE_CONVERSATION_PROMPT
 
 logger = get_logger(__name__)
+
+
+def _serialize_tool_calls(tool_calls: list[dict]) -> str:
+    """Serialize a list of tool_calls to a compact textual representation."""
+    parts: list[str] = []
+    for tc in tool_calls:
+        func = tc.get("function", {})
+        name = func.get("name", tc.get("name", "unknown"))
+        args = func.get("arguments", tc.get("arguments", ""))
+        if isinstance(args, dict):
+            args = json.dumps(args, ensure_ascii=False)
+        parts.append(f"{name}({args})")
+    return "; ".join(parts)
 
 
 async def compress_message(
     msg: dict[str, Any],
     max_msg_tokens: int,
     summary_tokens: int = 800,
+    model: str = "",
 ) -> dict[str, Any]:
     """当单条消息 token 数超过 max_msg_tokens 时，用 LLM 压缩。
 
@@ -32,7 +47,7 @@ async def compress_message(
     if not isinstance(content, str) or not content:
         return msg
 
-    tokens = count_tokens(content)
+    tokens = count_tokens(content, model=model)
     if tokens <= max_msg_tokens:
         return msg
 
@@ -50,8 +65,12 @@ async def compress_message(
             max_tokens=summary_tokens,
         )
         result = dict(msg)
-        result["content"] = f"[compressed]\n{summary.strip()}"
-        logger.info("Compress: {} -> {} tokens", tokens, count_tokens(result["content"]))
+        result["content"] = f"[compressed from {role}]\n{summary.strip()}"
+        logger.info(
+            "Compress: {} -> {} tokens",
+            tokens,
+            count_tokens(result["content"], model=model),
+        )
         return result
     except Exception:
         logger.warning("compress_message failed, keeping original", exc_info=True)
@@ -61,12 +80,16 @@ async def compress_message(
 async def compact_messages(
     messages: list[dict[str, Any]],
     summary_tokens: int = 2000,
-    scratchpad_path: str | None = None,
+    has_scratchpad: bool = False,
+    plan_status: str = "",
+    model: str = "",
 ) -> tuple[list[dict[str, Any]], int]:
     """全量压缩：保留 system message，其余全部合并为一条摘要。
 
     Args:
-        scratchpad_path: 归档文件路径，会写入摘要 hint 供 agent 回查。
+        has_scratchpad: 是否启用了 scratchpad 归档，会写入摘要 hint 供 agent 回查。
+        plan_status: 结构化的计划执行状态（来自 AgentRunState），
+                     帮助 LLM 摘要器保留准确的步骤完成信息。
 
     Returns:
         (compacted_messages, new_total_tokens)
@@ -76,7 +99,7 @@ async def compact_messages(
     rest = messages[start:]
 
     if not rest:
-        return messages, count_tokens_messages(messages)
+        return messages, count_tokens_messages(messages, model=model)
 
     context_parts: list[str] = []
     for msg in rest:
@@ -85,12 +108,24 @@ async def compact_messages(
         if isinstance(content, list):
             content = " ".join(str(c) for c in content)
         tag = "TOOL_RESULT" if role == "tool" else role
-        context_parts.append(f"[{tag}]: {content}")
+        tc = msg.get("tool_calls")
+        if tc and role == "assistant":
+            context_parts.append(f"[TOOL_CALLS]: {_serialize_tool_calls(tc)}")
+        if content:
+            context_parts.append(f"[{tag}]: {content}")
 
     full_context = "\n".join(context_parts)
+
+    plan_section = ""
+    if plan_status:
+        plan_section = (
+            f"# Plan Execution Status (MUST preserve in summary)\n{plan_status}"
+        )
+
     prompt = SUMMARIZE_CONVERSATION_PROMPT.format(
         max_tokens=summary_tokens,
         context=full_context,
+        plan_status=plan_section,
     )
 
     try:
@@ -103,15 +138,15 @@ async def compact_messages(
             max_tokens=summary_tokens,
         )
         hint = "[历史摘要"
-        if scratchpad_path:
-            hint += f" — 完整记录已归档: {scratchpad_path}"
+        if has_scratchpad:
+            hint += " — 完整记录已归档: $SCRATCHPAD"
         hint += "]"
         summary_msg: dict[str, Any] = {
             "role": "system",
             "content": f"{hint}\n{summary.strip()}",
         }
         result = ([system_msg] if system_msg else []) + [summary_msg]
-        new_total = count_tokens_messages(result)
+        new_total = count_tokens_messages(result, model=model)
         logger.info(
             "Compact: {} -> {} msgs, tokens -> {}",
             len(messages), len(result), new_total,
@@ -119,4 +154,4 @@ async def compact_messages(
         return result, new_total
     except Exception:
         logger.warning("compact_messages failed, keeping original", exc_info=True)
-        return messages, count_tokens_messages(messages)
+        return messages, count_tokens_messages(messages, model=model)

@@ -167,7 +167,7 @@ def log_llm_request(
     logger.debug(f"{SEPARATOR_DOTTED}")
 
 
-def log_llm_response(response: Any, truncate_length: int = 1000) -> None:
+def log_llm_response(response: Any, truncate_length: int = 1000, model: str = "") -> None:
     """记录 LLM 响应（自动截断）"""
     logger.debug("")
     logger.debug(f"{MARKER_LLM} LLM RESPONSE")
@@ -216,8 +216,7 @@ def log_llm_response(response: Any, truncate_length: int = 1000) -> None:
         except Exception as e:
             logger.debug(f"  Output Tokens: (error reading usage: {e})")
     else:
-        # 备用：手动计算输出token
-        output_tokens = count_tokens(content)
+        output_tokens = count_tokens(content, model=model)
         if usage == {}:
             logger.debug(
                 f"  Output Tokens: {output_tokens} (estimated, API returned empty usage)"

@@ -9,12 +9,10 @@ import re
 import select
 import signal
 import sys
-import time
 from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.rule import Rule
@@ -25,16 +23,19 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from version import __version__
+
 from core.memento_s.agent import MementoSAgent
-from core.memento_s.stream_output import (
+from core.protocol import (
     AGUIEventPipeline,
     AGUIEventType,
     PersistenceSink,
 )
-from core.manager import ConversationManager, SessionManager, generate_session_id
+from shared.chat import ChatManager, generate_session_id
 from middleware.config import g_config
-from utils.token_utils import estimate_tokens
+from utils.token_utils import count_tokens
 from utils.debug_logger import log_agent_start, log_agent_end, log_agent_phase
+from core.skill import SkillGateway
 
 console = Console()
 
@@ -122,16 +123,10 @@ class _InteractiveInput:
 
 def _print_banner(workspace: Path, session_id: str, version: str) -> None:
     """Print startup banner and basic info."""
-    try:
-        from importlib.metadata import version as _pkg_version
-
-        __version__ = _pkg_version("memento-s")
-    except Exception:
-        __version__ = version
-
+    # 直接使用传入的版本号（已从 version.py 或包元数据获取）
     banner = Text()
     banner.append("Memento-S", style="bold cyan")
-    banner.append(f"  v{__version__}", style="dim")
+    banner.append(f"  v{version}", style="dim")
     console.print(Panel(banner, border_style="cyan", padding=(0, 2)))
     console.print(f"  [dim]Workspace[/dim]  {workspace}")
     console.print(f"  [dim]Session[/dim]    {session_id}")
@@ -162,6 +157,7 @@ class _StreamRenderer:
     def __init__(self, render_markdown: bool) -> None:
         self._accumulated = ""
         self._render_markdown = render_markdown
+        self._awaiting_user_input = False
         self._dispatch = {
             AGUIEventType.RUN_STARTED: self._on_run_started,
             AGUIEventType.STEP_STARTED: self._on_step_started,
@@ -171,6 +167,7 @@ class _StreamRenderer:
             AGUIEventType.TEXT_MESSAGE_END: self._on_text_message_end,
             AGUIEventType.TOOL_CALL_START: self._on_tool_call_start,
             AGUIEventType.TOOL_CALL_RESULT: self._on_tool_call_result,
+            AGUIEventType.USER_INPUT_REQUESTED: self._on_user_input_requested,
             AGUIEventType.RUN_FINISHED: self._on_run_finished,
             AGUIEventType.RUN_ERROR: self._on_run_error,
         }
@@ -218,12 +215,40 @@ class _StreamRenderer:
         preview = result[:500] + "..." if len(result) > 500 else result
         console.print(f"    [dim]OUT:[/dim] {preview}")
 
+    def _on_user_input_requested(self, event: dict) -> None:
+        self.flush()
+        self._awaiting_user_input = True
+        question = event.get("question", "")
+        console.print()
+        console.print(
+            Panel(
+                question or "The agent needs your input.",
+                title="Agent Question",
+                title_align="left",
+                border_style="magenta",
+                padding=(0, 1),
+            )
+        )
+
     def _on_run_finished(self, event: dict) -> None:
+        if self._awaiting_user_input:
+            self._awaiting_user_input = False
+            self._accumulated = ""
+            return
         content = event.get("outputText", "") or ""
         if not content and self._accumulated:
             content = self._accumulated
         self._accumulated = ""
         _print_agent_response(content, self._render_markdown)
+        usage = event.get("usage")
+        if usage and isinstance(usage, dict):
+            prompt_t = usage.get("prompt_tokens", 0)
+            comp_t = usage.get("completion_tokens", 0)
+            total_t = prompt_t + comp_t
+            if total_t > 0:
+                console.print(
+                    f"  [dim]Tokens: {prompt_t:,} prompt + {comp_t:,} completion = {total_t:,} total[/dim]"
+                )
 
     def _on_run_error(self, event: dict) -> None:
         console.print(
@@ -238,13 +263,12 @@ async def _run_stream(
     session_id: str,
     message: str,
     render_markdown: bool,
-    conversation_manager: ConversationManager,
 ) -> None:
     """Consume reply_stream events, render, and persist in unified pipeline."""
     renderer = _StreamRenderer(render_markdown)
 
     user_title = message[:50] + "..." if len(message) > 50 else message
-    user_conv = await conversation_manager.create_conversation(
+    user_conv = await ChatManager.create_conversation(
         session_id=session_id,
         role="user",
         title=user_title,
@@ -254,13 +278,13 @@ async def _run_stream(
 
     async def _persist_assistant_output(content: str):
         assistant_title = content[:50] + "..." if len(content) > 50 else content
-        await conversation_manager.create_conversation(
+        await ChatManager.create_conversation(
             session_id=session_id,
             role="assistant",
             title=assistant_title,
             content=content,
             meta_info={"reply_to": user_conv.id},
-            tokens=estimate_tokens(content),
+            tokens=count_tokens(content),
         )
 
     pipeline = AGUIEventPipeline()
@@ -282,7 +306,6 @@ async def _run_interactive(
     session_id: str,
     inp: _InteractiveInput,
     render_markdown: bool,
-    conversation_manager: ConversationManager,
 ) -> None:
     """Interactive REPL loop: read input, stream response, repeat."""
     _EXIT_COMMANDS = frozenset({"/q", ":q", "exit", "quit", "/exit", "/quit"})
@@ -301,91 +324,70 @@ async def _run_interactive(
                 session_id,
                 command,
                 render_markdown,
-                conversation_manager,
             )
         except (KeyboardInterrupt, EOFError):
             inp.teardown()
             return
 
 
+_shutdown_requested = False
+
+
 def _sigint_handler(inp: _InteractiveInput, _signum: int, _frame) -> None:
+    global _shutdown_requested
+    _shutdown_requested = True
     inp.teardown()
-    os._exit(0)
+    raise SystemExit(0)
 
 
-def agent_command(
-    message: str = typer.Option(
-        None, "--message", "-m", help="Single message (non-interactive)"
-    ),
-    session_id: str | None = typer.Option(None, "--session", "-s", help="Session ID"),
-    markdown: bool = typer.Option(
-        True, "--markdown/--no-markdown", help="Render output as Markdown"
-    ),
-    version: str = "0.1.0",
+async def _async_main(
+    message: str | None,
+    session_id: str | None,
+    markdown: bool,
+    version: str,
 ) -> None:
-    """Chat with the Memento-S agent."""
+    """Single async entry point — all IO runs within one event loop."""
     import time
 
     start_time = time.monotonic()
-
     cfg = g_config
 
     workspace = cfg.paths.workspace_dir
     if workspace is None:
         raise ValueError("paths.workspace_dir 未设置")
 
-    # DEBUG: 记录 Agent 启动
     active_session_id = session_id or generate_session_id()
-    model_name = (
-        getattr(cfg.llm.active_profile, "model", "unknown")
-        if hasattr(cfg, "llm")
-        else "unknown"
-    )
+    model_name = cfg.llm.current.model if hasattr(cfg, "llm") else "unknown"
     log_agent_start(active_session_id, model_name, message or "[interactive mode]")
 
-    # 创建 Skill Gateway
-    # bootstrap 阶段已完成 skill 系统同步，此处直接创建 Gateway
-    from core.skill.gateway import create_gateway
-
     try:
-        skill_gateway = asyncio.run(create_gateway())
-        console.print(
-            f"[dim]Skill system ready ({len(skill_gateway.discover())} skills)[/dim]\n"
-        )
+        skill_gateway = await SkillGateway.from_config()
+        skills = await skill_gateway.discover()
+        console.print(f"[dim]Skill system ready ({len(skills)} skills)[/dim]\n")
         agent_instance = MementoSAgent(
             skill_gateway=skill_gateway,
-            session_manager=SessionManager(),
         )
     except Exception as e:
-        # 创建 Gateway 失败（异常情况）
-        console.print(f"[dim]Initializing skill system... ({e})[/dim]")
+        console.print(f"[dim]Skill system not available: {e}[/dim]")
         agent_instance = MementoSAgent()
-    session_manager = SessionManager()
-    conversation_manager = ConversationManager()
 
     if session_id:
-        existing = asyncio.run(session_manager.get_session(session_id))
+        existing = await ChatManager.get_session(session_id)
         if existing is None:
             raise ValueError(f"Session not found: {session_id}")
     else:
-        created = asyncio.run(
-            session_manager.create_session(title="CLI Session", metadata={})
-        )
-        session_id = created["id"]
+        created = await ChatManager.create_session(title="CLI Session", metadata={})
+        session_id = created.id
 
     _print_banner(workspace, session_id, version)
 
     if message:
-        asyncio.run(
-            _run_stream(
-                agent_instance,
-                session_id,
-                message,
-                render_markdown=markdown,
-                conversation_manager=conversation_manager,
-            )
+        await _run_stream(
+            agent_instance,
+            session_id,
+            message,
+            render_markdown=markdown,
         )
-        # DEBUG: 记录 Agent 结束（仅非交互模式）
         duration = time.monotonic() - start_time
         log_agent_end(session_id, duration, success=True)
         return
@@ -397,12 +399,23 @@ def agent_command(
     )
 
     signal.signal(signal.SIGINT, functools.partial(_sigint_handler, inp))
-    asyncio.run(
-        _run_interactive(
-            agent_instance,
-            session_id,
-            inp,
-            render_markdown=markdown,
-            conversation_manager=conversation_manager,
-        )
+    await _run_interactive(
+        agent_instance,
+        session_id,
+        inp,
+        render_markdown=markdown,
     )
+
+
+def agent_command(
+    message: str = typer.Option(
+        None, "--message", "-m", help="Single message (non-interactive)"
+    ),
+    session_id: str | None = typer.Option(None, "--session", "-s", help="Session ID"),
+    markdown: bool = typer.Option(
+        True, "--markdown/--no-markdown", help="Render output as Markdown"
+    ),
+    version: str = __version__,
+) -> None:
+    """Chat with the Memento-S agent."""
+    asyncio.run(_async_main(message, session_id, markdown, version))

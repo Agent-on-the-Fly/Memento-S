@@ -1,6 +1,8 @@
 """Utility functions for storage module."""
 
+import struct
 from datetime import datetime, timezone, timedelta
+from typing import List
 
 
 def get_east_8_time() -> datetime:
@@ -15,3 +17,8 @@ def get_east_8_time() -> datetime:
     east_8_now = utc_now.astimezone(east_8)
     # Return naive datetime (without timezone info)
     return east_8_now.replace(tzinfo=None)
+
+
+def serialize_f32(vec: List[float]) -> bytes:
+    """将 float list 序列化为 little-endian float32 bytes（sqlite-vec 格式）"""
+    return struct.pack(f"<{len(vec)}f", *vec)

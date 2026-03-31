@@ -14,7 +14,7 @@ from datetime import datetime
 import flet as ft
 
 from middleware.config import g_config
-from core.manager import SessionManager, ConversationManager
+from shared.chat import ChatManager
 from gui.widgets.chat_message import ChatMessage
 from gui.i18n import t
 from utils.token_utils import count_tokens_messages
@@ -52,23 +52,20 @@ class ConversationController:
     def __init__(self, app, logger):
         self.app = app
         self.logger = logger
-        self._session_manager = SessionManager()
-        self._conversation_manager = ConversationManager()
 
     async def _sync_session_stats(self, session_id: str | None):
         """Sync sidebar stats and GUI token display from accurate token calculation."""
         if not session_id:
             return
 
-        session_data = await self._session_manager.get_session(session_id)
-        if session_data:
-            # Recalculate tokens accurately using tiktoken
+        session = await ChatManager.get_session(session_id)
+        if session:
             accurate_tokens = count_tokens_messages(self.app.messages)
-            
+
             # Update sidebar stats only (must not reorder on select/click)
-            self.app.sidebar.update_session_stats(
+            self.app.session_sidebar.update_session_stats(
                 session_id,
-                session_data.get("conversation_count", 0),
+                session.conversation_count,
                 accurate_tokens,
             )
             # Update GUI token display
@@ -79,7 +76,7 @@ class ConversationController:
         """Ensure current session exists, create if not."""
         if self.app.current_session_id:
             # Verify session still exists
-            if await self._session_manager.exists(self.app.current_session_id):
+            if await ChatManager.session_exists(self.app.current_session_id):
                 return self.app.current_session_id
 
         # Create new session
@@ -92,34 +89,31 @@ class ConversationController:
             if g_config and g_config.llm and g_config.llm.current:
                 model = g_config.llm.current.model
 
-            session_data = await self._session_manager.create_session(
+            session = await ChatManager.create_session(
                 title=t("sidebar.new_session"),
                 metadata={"model": model},
             )
-            self.app.current_session_id = session_data["id"]
+            self.app.current_session_id = session.id
 
             # Add new session to sidebar
             from middleware.storage.schemas import SessionRead
-            from datetime import datetime
 
             session_read = SessionRead(
-                id=session_data["id"],
-                title=session_data["title"],
-                description=None,
-                status="active",
-                meta_info=session_data.get("metadata", {}),
-                conversation_count=0,
-                total_tokens=0,
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
+                id=session.id,
+                title=session.title,
+                description=session.description,
+                status=session.status,
+                meta_info=session.metadata,
+                conversation_count=session.conversation_count,
+                total_tokens=session.total_tokens,
+                created_at=session.created_at,
+                updated_at=session.updated_at,
             )
-            self.app.sidebar.add_session(session_read)
-            self.app.sidebar.set_active(session_data["id"])
+            self.app.session_sidebar.add_session(session_read)
+            self.app.session_sidebar.set_active(session.id)
 
-            self.logger.info(
-                f"[SESSION] Created and added to sidebar: {session_data['id']}"
-            )
-            return session_data["id"]
+            self.logger.info(f"[SESSION] Created and added to sidebar: {session.id}")
+            return session.id
 
         except Exception as e:
             self.logger.error(f"[SESSION] Failed to create: {e}")
@@ -127,9 +121,9 @@ class ConversationController:
 
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count for mixed language text."""
-        from utils.token_utils import estimate_tokens
+        from utils.token_utils import count_tokens
 
-        return estimate_tokens(text)
+        return count_tokens(text)
 
     async def create_user_conversation(self, content: str) -> dict:
         """Create a user conversation."""
@@ -138,7 +132,10 @@ class ConversationController:
         title = content[:50] + "..." if len(content) > 50 else content
         # Calculate approximate tokens for user message
         tokens = self._estimate_tokens(content)
-        conversation = await self._conversation_manager.create_conversation(
+
+        self.logger.info(f"[DEBUG] Creating conversation in session: {session_id}")
+
+        conversation = await ChatManager.create_conversation(
             session_id=session_id,
             role="user",
             title=title,
@@ -150,7 +147,7 @@ class ConversationController:
         await self._sync_session_stats(session_id)
 
         self.logger.info(
-            f"[CONV] Created user conversation: {conversation.id} ({tokens} tokens)"
+            f"[CONV] Created user conversation: {conversation.id} in session {session_id}"
         )
         return {
             "id": conversation.id,
@@ -175,13 +172,18 @@ class ConversationController:
         if reply_to:
             meta_info["reply_to"] = reply_to
 
-        conversation = await self._conversation_manager.create_conversation(
+        # 确保 tokens 是整数，处理 None 的情况
+        tokens = kwargs.get("tokens")
+        if tokens is None:
+            tokens = self._estimate_tokens(content)
+
+        conversation = await ChatManager.create_conversation(
             session_id=session_id,
             role="assistant",
             title=title,
             content=content,
             meta_info=meta_info,
-            tokens=kwargs.get("tokens", self._estimate_tokens(content)),
+            tokens=tokens,
         )
 
         await self._sync_session_stats(session_id)
@@ -189,6 +191,33 @@ class ConversationController:
         self.logger.info(f"[CONV] Created assistant conversation: {conversation.id}")
         return {
             "id": conversation.id,
+            "role": "assistant",
+            "content": content,
+        }
+
+    async def update_assistant_conversation(
+        self, conversation_id: str, content: str, **kwargs
+    ) -> dict:
+        """Update an existing assistant conversation with new content."""
+        title = content[:50] + "..." if len(content) > 50 else content
+
+        conversation = await ChatManager.update_conversation(
+            conversation_id=conversation_id,
+            title=title,
+            content=content,
+            meta_info={
+                "timestamp": datetime.now().isoformat(),
+                **kwargs,
+            },
+        )
+
+        if conversation:
+            self.logger.info(
+                f"[CONV] Updated assistant conversation: {conversation_id}"
+            )
+
+        return {
+            "id": conversation_id,
             "role": "assistant",
             "content": content,
         }
@@ -205,7 +234,7 @@ class ConversationController:
         self.app.total_tokens = 0
         self.app.current_session_id = None
         self.app._update_token_display()
-        self.app.sidebar.set_active(None)
+        self.app.session_sidebar.set_active(None)
         self.app._update_toolbar_title(t("sidebar.new_session"))
         self.app._set_status(t("status.new_session"))
         self.app.page.update()
@@ -234,7 +263,7 @@ class ConversationController:
             self.logger.info(f"[SELECT] Loading session: {session_id}")
 
             # Load session
-            session = await self._session_manager.get_session(session_id)
+            session = await ChatManager.get_session(session_id)
             if not session:
                 self.app._show_error(t("error.session_not_exist", id=session_id))
                 return
@@ -242,9 +271,11 @@ class ConversationController:
             # Update session ID
             self.app.current_session_id = session_id
 
-            # Get all conversations in session
-            conversations = await self._conversation_manager.list_session_conversations(
-                session_id, limit=100
+            # Get all conversations in session (增加 limit 以加载更多历史)
+            self.logger.info(f"[DEBUG] Loading conversations for session: {session_id}")
+            conversations = await ChatManager.list_conversations(session_id, limit=1000)
+            self.logger.info(
+                f"[DEBUG] Found {len(conversations)} conversations for session {session_id}"
             )
 
             # Build messages list for display
@@ -267,6 +298,14 @@ class ConversationController:
                     "updated_at": conv.updated_at.isoformat()
                     if conv.updated_at
                     else None,
+                    # Extract timing info from meta_info for convenience
+                    "steps": conv.meta_info.get("steps") if conv.meta_info else None,
+                    "duration_seconds": conv.meta_info.get("duration_seconds")
+                    if conv.meta_info
+                    else None,
+                    "model_name": conv.meta_info.get("model_name")
+                    if conv.meta_info
+                    else None,
                 }
                 for conv in conversations
             ]
@@ -283,7 +322,19 @@ class ConversationController:
 
             for msg in self.app.messages:
                 is_user = msg.get("role") == "user"
-                content = msg.get("content", "")
+                content = msg.get("content") or ""
+                role = msg.get("role", "")
+
+                # 跳过 tool 角色的消息（工具执行结果）
+                if role == "tool":
+                    continue
+
+                # 跳过空的 assistant 占位消息（tool_call 标记消息）
+                # 这些消息用于记录 tool_calls，但 content 为空，无需显示
+                if role == "assistant" and not content.strip():
+                    continue
+
+                # 渲染消息
                 if isinstance(content, str):
                     msg_widget = ChatMessage(
                         content,
@@ -292,14 +343,13 @@ class ConversationController:
                         steps=msg.get("steps"),
                         duration_seconds=msg.get("duration_seconds"),
                         timestamp=_parse_timestamp(msg.get("timestamp")),
+                        model_name=msg.get("model_name") if not is_user else None,
                     )
                     self.app.chat_list.controls.append(msg_widget)
 
             # Update UI
-            self.app.sidebar.set_active(session_id)
-            self.app._update_toolbar_title(
-                session.get("title", t("sidebar.new_session"))
-            )
+            self.app.session_sidebar.set_active(session_id)
+            self.app._update_toolbar_title(session.title or t("sidebar.new_session"))
 
             # Sync token count from session
             await self._sync_session_stats(session_id)
@@ -307,7 +357,7 @@ class ConversationController:
             self.app._set_status(
                 t(
                     "status.session_loaded",
-                    title=session.get("title", "Untitled"),
+                    title=session.title or "Untitled",
                     count=len(conversations),
                 )
             )
@@ -330,9 +380,7 @@ class ConversationController:
 
         async def _perform_delete():
             try:
-                success = await self._conversation_manager.delete_conversation(
-                    conversation_id
-                )
+                success = await ChatManager.delete_conversation(conversation_id)
 
                 if success:
                     self.logger.info(f"[DELETE] Deleted: {conversation_id}")
@@ -355,6 +403,14 @@ class ConversationController:
                     for msg in self.app.messages:
                         is_user = msg.get("role") == "user"
                         content = msg.get("content", "")
+                        role = msg.get("role", "")
+
+                        # 跳过 tool 角色和空的 assistant 消息
+                        if role == "tool":
+                            continue
+                        if role == "assistant" and not content.strip():
+                            continue
+
                         if isinstance(content, str):
                             self.app.chat_list.controls.append(
                                 ChatMessage(
@@ -364,6 +420,9 @@ class ConversationController:
                                     steps=msg.get("steps"),
                                     duration_seconds=msg.get("duration_seconds"),
                                     timestamp=_parse_timestamp(msg.get("timestamp")),
+                                    model_name=msg.get("model_name")
+                                    if not is_user
+                                    else None,
                                 )
                             )
 
@@ -409,9 +468,7 @@ class ConversationController:
         self.logger.info(f"[RENAME] Dialog for: {conversation_id}")
 
         try:
-            conversation = await self._conversation_manager.get_conversation(
-                conversation_id
-            )
+            conversation = await ChatManager.get_conversation(conversation_id)
             if not conversation:
                 self.app._show_snackbar(
                     t("dialog.not_found", type=t("sidebar.conversations"))
@@ -426,9 +483,7 @@ class ConversationController:
 
             async def _perform_rename(new_title: str):
                 try:
-                    from middleware.storage.schemas import ConversationUpdate
-
-                    updated = await self._conversation_manager.update_conversation(
+                    updated = await ChatManager.update_conversation(
                         conversation_id,
                         title=new_title,
                     )
@@ -484,50 +539,45 @@ class ConversationController:
         """Load sessions list on app start (paginated)."""
         try:
             # Load sessions for sidebar
-            all_sessions = await self._session_manager.list_sessions(limit=100)
+            all_sessions = await ChatManager.list_sessions(limit=100)
 
             if all_sessions:
                 # Store pagination state
-                self.app.sidebar.total_sessions = len(all_sessions)
-                self.app.sidebar.loaded_sessions = min(page_size, len(all_sessions))
+                self.app.session_sidebar.total_sessions = len(all_sessions)
+                self.app.session_sidebar.loaded_sessions = min(
+                    page_size, len(all_sessions)
+                )
 
                 # Only load first page to sidebar
                 sessions = all_sessions[:page_size]
 
                 for s in sessions:
-                    # Convert dict to SessionRead-like object
+                    # Convert SessionInfo to SessionRead-like object
                     from middleware.storage.schemas import SessionRead
-                    from datetime import datetime
 
                     session_read = SessionRead(
-                        id=s["id"],
-                        title=s["title"],
-                        description=s.get("description"),
-                        status=s.get("status", "active"),
-                        meta_info=s.get("metadata", {}),
-                        conversation_count=s.get("conversation_count", 0),
-                        total_tokens=s.get("total_tokens", 0),
-                        created_at=datetime.fromisoformat(s["created_at"])
-                        if s.get("created_at")
-                        else datetime.now(),
-                        updated_at=datetime.fromisoformat(s["updated_at"])
-                        if s.get("updated_at")
-                        else datetime.now(),
+                        id=s.id,
+                        title=s.title,
+                        description=s.description,
+                        status=s.status,
+                        meta_info=s.metadata,
+                        conversation_count=s.conversation_count,
+                        total_tokens=s.total_tokens,
+                        created_at=s.created_at,
+                        updated_at=s.updated_at,
                     )
-                    self.app.sidebar.add_session(session_read)
+                    self.app.session_sidebar.add_session(session_read)
 
                 # Auto-select the most recent session and load its conversations
                 most_recent = sessions[0]
-                self.app.current_session_id = most_recent["id"]
+                self.app.current_session_id = most_recent.id
                 self.logger.info(
-                    f"[INIT] Auto-selected recent session: {most_recent['id']}"
+                    f"[INIT] Auto-selected recent session: {most_recent.id}"
                 )
 
                 # Load conversations for the selected session
-                conversations = (
-                    await self._conversation_manager.list_session_conversations(
-                        most_recent["id"], limit=100
-                    )
+                conversations = await ChatManager.list_conversations(
+                    most_recent.id, limit=1000
                 )
 
                 # Load messages into chat area
@@ -550,6 +600,16 @@ class ConversationController:
                         "updated_at": conv.updated_at.isoformat()
                         if conv.updated_at
                         else None,
+                        # Extract timing info from meta_info for convenience
+                        "steps": conv.meta_info.get("steps")
+                        if conv.meta_info
+                        else None,
+                        "duration_seconds": conv.meta_info.get("duration_seconds")
+                        if conv.meta_info
+                        else None,
+                        "model_name": conv.meta_info.get("model_name")
+                        if conv.meta_info
+                        else None,
                     }
                     for conv in conversations
                 ]
@@ -565,6 +625,14 @@ class ConversationController:
                 for msg in self.app.messages:
                     is_user = msg.get("role") == "user"
                     content = msg.get("content", "")
+                    role = msg.get("role", "")
+
+                    # 跳过 tool 角色和空的 assistant 消息
+                    if role == "tool":
+                        continue
+                    if role == "assistant" and not content.strip():
+                        continue
+
                     if isinstance(content, str):
                         msg_widget = ChatMessage(
                             content,
@@ -573,17 +641,18 @@ class ConversationController:
                             steps=msg.get("steps"),
                             duration_seconds=msg.get("duration_seconds"),
                             timestamp=_parse_timestamp(msg.get("timestamp")),
+                            model_name=msg.get("model_name") if not is_user else None,
                         )
                         self.app.chat_list.controls.append(msg_widget)
 
                 # Update UI
-                self.app.sidebar.set_active(most_recent["id"])
+                self.app.session_sidebar.set_active(most_recent.id)
                 self.app._update_toolbar_title(
-                    most_recent.get("title", t("sidebar.new_session"))
+                    most_recent.title or t("sidebar.new_session")
                 )
 
                 # Sync token count
-                await self._sync_session_stats(most_recent["id"])
+                await self._sync_session_stats(most_recent.id)
 
                 # Show pagination status
                 total = len(all_sessions)
@@ -619,13 +688,11 @@ class ConversationController:
 
         try:
             session_id = self.app.current_session_id
-            current_loaded = self.app.sidebar.loaded_conversations
+            current_loaded = self.app.session_sidebar.loaded_conversations
 
             # Get all conversations
-            all_conversations = (
-                await self._conversation_manager.list_session_conversations(
-                    session_id, limit=1000
-                )
+            all_conversations = await ChatManager.list_conversations(
+                session_id, limit=1000
             )
 
             # Calculate next page
@@ -637,14 +704,16 @@ class ConversationController:
 
             # Add to sidebar
             for conv in next_batch:
-                self.app.sidebar.add_conversation(conv)
+                self.app.session_sidebar.add_conversation(conv)
 
             # Update pagination state
-            self.app.sidebar.loaded_conversations = current_loaded + len(next_batch)
+            self.app.session_sidebar.loaded_conversations = current_loaded + len(
+                next_batch
+            )
 
             # Update status
             total = len(all_conversations)
-            loaded = self.app.sidebar.loaded_conversations
+            loaded = self.app.session_sidebar.loaded_conversations
             remaining = total - loaded
 
             if remaining > 0:
@@ -668,11 +737,88 @@ class ConversationController:
             self.logger.error(f"[PAGINATION] Error loading more conversations: {e}")
             self.app._show_snackbar(t("status.load_conversations_failed", error=str(e)))
 
-    async def generate_conversation_title(self, conversation_id: str = None):
-        """Generate title for a conversation using LLM."""
-        # This would use the LLM to generate a title based on content
-        # For now, just use first 30 chars of content
-        pass
+    async def generate_conversation_title(self, content: str = None):
+        """Generate title for a conversation using LLM based on first user message.
+
+        Args:
+            content: The first user message content to base the title on
+        """
+        if not content:
+            return
+
+        try:
+            # Import LLMClient here to avoid circular imports
+            from middleware.llm.llm_client import LLMClient
+
+            # Create a simple prompt for title generation
+            prompt = f"""Based on the following user message, generate a concise session title (10-20 characters in the same language as the message). Return ONLY the title text without quotes or explanation.
+
+User message: {content[:500]}"""
+
+            client = LLMClient()
+            response = await client.async_chat(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=50,
+                temperature=0.3,
+            )
+
+            title = response.content.strip() if response.content else None
+
+            # Clean up the title (remove quotes if any)
+            if title:
+                title = title.strip("\"'").strip()
+                # Fallback to truncated content if title is too long or empty
+                if len(title) > 50 or not title:
+                    title = content[:30] + "..." if len(content) > 30 else content
+            else:
+                title = content[:30] + "..." if len(content) > 30 else content
+
+            # Update session title
+            if self.app.current_session_id:
+                from middleware.storage.schemas import SessionRead
+                from datetime import datetime
+
+                session = await ChatManager.update_session(
+                    self.app.current_session_id,
+                    title=title,
+                )
+
+                if session:
+                    # Update sidebar
+                    session_read = SessionRead(
+                        id=session.id,
+                        title=session.title,
+                        description=session.description,
+                        status=session.status,
+                        meta_info=session.metadata,
+                        conversation_count=session.conversation_count,
+                        total_tokens=session.total_tokens,
+                        created_at=session.created_at,
+                        updated_at=session.updated_at,
+                    )
+                    self.app.session_sidebar.update_session(session_read)
+
+                    # Update toolbar title
+                    self.app._update_toolbar_title(title)
+
+                    self.logger.info(f"[TITLE] Generated session title: '{title}'")
+
+        except Exception as e:
+            # Silently fail - title generation is not critical
+            self.logger.warning(f"[TITLE] Failed to generate title: {e}")
+            # Fallback: use truncated content
+            try:
+                if self.app.current_session_id and content:
+                    fallback_title = (
+                        content[:30] + "..." if len(content) > 30 else content
+                    )
+                    await ChatManager.update_session(
+                        self.app.current_session_id,
+                        title=fallback_title,
+                    )
+                    self.app._update_toolbar_title(fallback_title)
+            except Exception:
+                pass
 
     async def list_conversations_for_sidebar(self) -> list:
         """Get all conversations for current session to display in sidebar."""
@@ -680,8 +826,8 @@ class ConversationController:
             return []
 
         try:
-            conversations = await self._conversation_manager.list_session_conversations(
-                self.app.current_session_id, limit=100
+            conversations = await ChatManager.list_conversations(
+                self.app.current_session_id, limit=1000
             )
             return conversations
         except Exception as e:
@@ -694,11 +840,11 @@ class ConversationController:
 
         async def _perform_delete():
             try:
-                success = await self._session_manager.delete_session(session_id)
+                success = await ChatManager.delete_session(session_id)
 
                 if success:
                     self.logger.info(f"[DELETE SESSION] Deleted: {session_id}")
-                    self.app.sidebar.remove_session(session_id)
+                    self.app.session_sidebar.remove_session(session_id)
                     self.app.page.update()
                     self.app._show_snackbar(t("status.session_deleted"))
                     # Clear chat if deleted session was active
@@ -746,50 +892,41 @@ class ConversationController:
         self.logger.info(f"[RENAME SESSION] Dialog for: {session_id}")
 
         try:
-            session = await self._session_manager.get_session(session_id)
+            session = await ChatManager.get_session(session_id)
             if not session:
                 self.app._show_snackbar(t("dialog.not_found", type=t("sidebar.title")))
                 return
 
             new_title_field = ft.TextField(
-                value=session.get("title", ""),
+                value=session.title,
                 label=t("dialog.new_title_label"),
                 autofocus=True,
             )
 
             async def _perform_rename(new_title: str):
                 try:
-                    from middleware.storage.schemas import SessionUpdate
-
-                    updated = await self._session_manager.update_session(
+                    session = await ChatManager.update_session(
                         session_id,
                         title=new_title,
                     )
 
-                    if updated:
+                    if session:
                         self.logger.info(f"[RENAME SESSION] Updated to '{new_title}'")
-                        # Reload to get updated data
-                        s = await self._session_manager.get_session(session_id)
                         # Create a SessionRead-like object for sidebar
                         from middleware.storage.schemas import SessionRead
-                        from datetime import datetime
 
                         session_read = SessionRead(
-                            id=s["id"],
-                            title=s["title"],
-                            description=s.get("description"),
-                            status=s.get("status", "active"),
-                            meta_info=s.get("metadata", {}),
-                            conversation_count=s.get("conversation_count", 0),
-                            total_tokens=s.get("total_tokens", 0),
-                            created_at=datetime.fromisoformat(s["created_at"])
-                            if s.get("created_at")
-                            else datetime.now(),
-                            updated_at=datetime.fromisoformat(s["updated_at"])
-                            if s.get("updated_at")
-                            else datetime.now(),
+                            id=session.id,
+                            title=session.title,
+                            description=session.description,
+                            status=session.status,
+                            meta_info=session.metadata,
+                            conversation_count=session.conversation_count,
+                            total_tokens=session.total_tokens,
+                            created_at=session.created_at,
+                            updated_at=session.updated_at,
                         )
-                        self.app.sidebar.update_session(session_read)
+                        self.app.session_sidebar.update_session(session_read)
                         self.app.page.update()
                         self.app._show_snackbar(t("status.session_renamed"))
                     else:
@@ -835,10 +972,10 @@ class ConversationController:
     async def load_more_sessions(self, page_size: int = 20):
         """Load more sessions (pagination)."""
         try:
-            current_loaded = self.app.sidebar.loaded_sessions
+            current_loaded = self.app.session_sidebar.loaded_sessions
 
             # Get all sessions
-            all_sessions = await self._session_manager.list_sessions(limit=100)
+            all_sessions = await ChatManager.list_sessions(limit=100)
 
             # Calculate next page
             next_batch = all_sessions[current_loaded : current_loaded + page_size]
@@ -849,33 +986,28 @@ class ConversationController:
 
             # Add to sidebar
             for s in next_batch:
-                # Convert dict to SessionRead-like object
+                # Convert SessionInfo to SessionRead-like object
                 from middleware.storage.schemas import SessionRead
-                from datetime import datetime
 
                 session_read = SessionRead(
-                    id=s["id"],
-                    title=s["title"],
-                    description=s.get("description"),
-                    status=s.get("status", "active"),
-                    meta_info=s.get("metadata", {}),
-                    conversation_count=s.get("conversation_count", 0),
-                    total_tokens=s.get("total_tokens", 0),
-                    created_at=datetime.fromisoformat(s["created_at"])
-                    if s.get("created_at")
-                    else datetime.now(),
-                    updated_at=datetime.fromisoformat(s["updated_at"])
-                    if s.get("updated_at")
-                    else datetime.now(),
+                    id=s.id,
+                    title=s.title,
+                    description=s.description,
+                    status=s.status,
+                    meta_info=s.metadata,
+                    conversation_count=s.conversation_count,
+                    total_tokens=s.total_tokens,
+                    created_at=s.created_at,
+                    updated_at=s.updated_at,
                 )
-                self.app.sidebar.add_session(session_read)
+                self.app.session_sidebar.add_session(session_read)
 
             # Update pagination state
-            self.app.sidebar.loaded_sessions = current_loaded + len(next_batch)
+            self.app.session_sidebar.loaded_sessions = current_loaded + len(next_batch)
 
             # Update status
             total = len(all_sessions)
-            loaded = self.app.sidebar.loaded_sessions
+            loaded = self.app.session_sidebar.loaded_sessions
             remaining = total - loaded
 
             if remaining > 0:

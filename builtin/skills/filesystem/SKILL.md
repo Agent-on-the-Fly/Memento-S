@@ -10,7 +10,9 @@ Direct filesystem operations without external dependencies. Read, write, edit, l
 
 ## Usage
 
-Use the available builtin tools (`list_dir`, `read_file`, `file_create`, `edit_file_by_lines`, `bash`) to perform file operations directly.
+Use the available builtin tools to perform file operations directly. Commonly used tools for this skill are: `list_dir`, `read_file`, `file_create`, `edit_file_by_lines`, `grep`, and `bash`.
+
+When the task requires programmatic/structured processing (e.g., parsing complex formats or batch transformations), `python_repl` can be used as an advanced fallback.
 
 - Paths can be absolute or relative to working_dir
 - Parent directories are created automatically for write operations

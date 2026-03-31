@@ -1,16 +1,28 @@
-"""retrieval — 技能检索（Embedding 向量 + 云端目录 + 多路召回）"""
+"""retrieval — 技能检索（本地向量 + 远程召回 + 多路合并）"""
 
-from .embedding_recall import EmbeddingMatch, EmbeddingRecall
-from .indexer import SkillIndexer
-from .multi_recall import MultiRecall, RecallCandidate
-from .remote_catalog import RemoteCloudCatalog, RemoteSkillInfo
+from .base import BaseRecall
+from .local_file_recall import LocalFileRecall
+from .multi_recall import MultiRecall
+from .remote_recall import RemoteRecall
+from .schema import RecallCandidate
 
-__all__ = [
-    "EmbeddingMatch",
-    "EmbeddingRecall",
-    "SkillIndexer",
-    "MultiRecall",
-    "RecallCandidate",
-    "RemoteCloudCatalog",
-    "RemoteSkillInfo",
-]
+# LocalDbRecall 是可选的（依赖 sqlite-vec）
+try:
+    from .local_db_recall import LocalDbRecall
+
+    __all__ = [
+        "BaseRecall",
+        "LocalDbRecall",
+        "LocalFileRecall",
+        "MultiRecall",
+        "RecallCandidate",
+        "RemoteRecall",
+    ]
+except ImportError:
+    __all__ = [
+        "BaseRecall",
+        "LocalFileRecall",
+        "MultiRecall",
+        "RecallCandidate",
+        "RemoteRecall",
+    ]

@@ -2,23 +2,136 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
-import shutil
+import re
 from pathlib import Path
-from typing import Any
 
-from ._base import _resolve_path
-from core.utils.platform import has_bash, has_powershell
 from middleware.config import g_config
+from middleware.sandbox import execute_shell
+
+
+def _get_dangerous_patterns() -> list[str]:
+    """Get dangerous command patterns for current platform."""
+    if os.name == "nt":  # Windows
+        return [
+            # Windows file deletion
+            r"rmdir\s+/[sq]\s+[a-zA-Z]:\\",
+            r"del\s+/[fq]\s+[a-zA-Z]:\\",
+            r"Remove-Item\s+-Recurse\s+-Force",
+            # Format commands
+            r"format\s+[a-zA-Z]:",
+            # Direct writes to Windows system directories
+            r">\s*[a-zA-Z]:\\Windows",
+            r">\s*[a-zA-Z]:\\Program\s+Files",
+            r">\s*C:\\Windows\\System32",
+            # Registry operations
+            r"reg\s+(add|delete|import)",
+            r"Set-ItemProperty\s+-Path\s+.*Registry",
+        ]
+    else:  # Unix/Linux/macOS
+        return [
+            # System-level file operations outside workspace
+            r"rm\s+-rf\s+/[^\s]*",
+            r"rm\s+-rf\s+\$HOME",
+            r"rm\s+-rf\s+~",
+            # Direct writes to system directories
+            r">\s*/etc/\w+",
+            r">\s*/usr/\w+",
+            r">\s*/bin/\w+",
+            r">\s*/sbin/\w+",
+            r">\s*/lib.*/\w+",
+        ]
+
+
+def _get_system_paths() -> frozenset[str]:
+    """Get system paths for current platform."""
+    if os.name == "nt":  # Windows
+        return frozenset(
+            {
+                "C:\\Windows",
+                "C:\\Windows\\System32",
+                "C:\\Program Files",
+                "C:\\Program Files (x86)",
+                "C:\\Users",
+                "C:\\ProgramData",
+                "C:\\",
+            }
+        )
+    else:  # Unix/Linux/macOS
+        return frozenset(
+            {
+                "/etc",
+                "/usr",
+                "/bin",
+                "/sbin",
+                "/lib",
+                "/lib64",
+                "/opt",
+                "/var",
+                "/tmp",
+                "/root",
+                "/home",
+                "/sys",
+                "/proc",
+                "/dev",
+                "/boot",
+                "/run",
+            }
+        )
+
+
+# Compile dangerous patterns for current platform
+_DANGEROUS_REGEX = [
+    re.compile(pattern, re.IGNORECASE) for pattern in _get_dangerous_patterns()
+]
+_SYSTEM_PATHS = _get_system_paths()
+
+
+def _sanitize_bash_command(command: str) -> tuple[str, list[str], str | None]:
+    """Validate bash command and return explanatory rejection when needed.
+
+    Returns:
+        Tuple of (sanitized_command, warnings, reject_reason)
+    """
+    warnings = []
+
+    # Check for dangerous patterns
+    for pattern in _DANGEROUS_REGEX:
+        if pattern.search(command):
+            return (
+                command,
+                warnings,
+                f"Command rejected: matched dangerous pattern `{pattern.pattern}`.",
+            )
+
+    # Check for path traversal attempts (cross-platform)
+    if re.search(r"\.\./\.\./\.\.", command):
+        return (
+            command,
+            warnings,
+            "Command rejected: path traversal (`../../../`) is not allowed.",
+        )
+
+    # Check for absolute paths to system directories
+    for sys_path in _SYSTEM_PATHS:
+        normalized_cmd = command.replace("\\", "/")
+        normalized_sys = sys_path.replace("\\", "/")
+        pattern = rf"(?:\s|^|\"|'|=){re.escape(normalized_sys)}(?:/|\\|\s|$|\"|')"
+        if re.search(pattern, normalized_cmd, re.IGNORECASE):
+            return (
+                command,
+                warnings,
+                f"Command rejected: references protected system path `{sys_path}`.",
+            )
+
+    return command, warnings, None
 
 
 async def bash_tool(
     command: str,
     env: dict[str, str] | None = None,
-    base_dir: str | None = None,
-    work_dir: str | None = None,
     stdin: str | None = None,
+    work_dir: str | None = None,
 ) -> str:
     """
     Execute a shell command in the workspace.
@@ -33,202 +146,70 @@ async def bash_tool(
     Args:
         command: The shell command to run.
         env: Optional custom environment variables to inject.
-        base_dir: Optional base directory for path resolution (security boundary).
-        work_dir: Optional working directory for command execution.
         stdin: Optional standard input to pass to the command.
+        work_dir: The working directory for command execution (absolute path, pre-validated).
     """
     try:
-        # Build environment: system env + sandbox env + custom env
-        safe_env = _build_sandbox_env(env)
+        # work_dir is pre-validated by ToolContext as absolute path
+        # It defaults to context.root_dir via enrich_args() if not provided
+        cwd = Path(work_dir) if work_dir else None
 
-        cwd = None
-        if work_dir:
-            cwd = _resolve_path(work_dir, Path(base_dir) if base_dir else None)
-        elif base_dir:
-            cwd = _resolve_path(".", Path(base_dir))
-        else:
+        if cwd is None:
+            # Fallback only when called directly without ToolContext
+            if not hasattr(g_config, "_config") or g_config._config is None:
+                raise RuntimeError(
+                    "g_config not initialized. Please ensure bootstrap() is called before using tools."
+                )
+            if g_config.paths.workspace_dir is None:
+                raise RuntimeError(
+                    "g_config.paths.workspace_dir is None. Please check configuration."
+                )
             cwd = Path(g_config.paths.workspace_dir)
 
-        # Ensure python resolves to uv sandbox python when available
-        if "UV_PYTHON" in safe_env:
-            print(
-                f"bash_tool: UV_PYTHON Running command: {command}! safe_env: {safe_env}"
+        # Validate command for dangerous patterns and system paths
+        sanitized_command, warnings, reject_reason = _sanitize_bash_command(command)
+        if reject_reason:
+            return (
+                "ERR: bash command blocked by policy\n"
+                f"Reason: {reject_reason}\n"
+                "Hint: Use paths under @ROOT (workspace), and avoid system paths or traversal patterns."
             )
-            command = _rewrite_python_command(command, safe_env["UV_PYTHON"])
 
-        # Rewrite uv pip install to use mirror (more reliable than env vars)
-        command = _rewrite_uv_pip_command(command, safe_env)
+        # Path validation is handled by ToolContext.resolve_path() in the execution layer
+        # The _sanitize_bash_command above only checks for dangerous patterns and system paths
+        # as a defense-in-depth measure, but does not re-implement boundary checking
 
-        shell_args = _select_shell(command)
-
-        print(
-            f"bash_tool: Running command: {command}! shell_args: {shell_args}, safe_env: {safe_env}"
+        # Execute command through sandbox (which handles environment setup and path isolation)
+        result = execute_shell(
+            command=sanitized_command,
+            extra_env=env,
+            work_dir=cwd,
+            timeout=300,
         )
 
-        if shell_args is None:
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                stdin=asyncio.subprocess.PIPE if stdin is not None else None,
-                cwd=cwd,
-                env=safe_env,
-            )
-        else:
-            proc = await asyncio.create_subprocess_exec(
-                *shell_args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                stdin=asyncio.subprocess.PIPE if stdin is not None else None,
-                cwd=cwd,
-                env=safe_env,
-            )
-
-        try:
-            input_bytes = stdin.encode("utf-8") if stdin is not None else None
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input_bytes), timeout=300
-            )
-        except asyncio.TimeoutError:
-            proc.kill()
-            from core.utils.platform import background_hint
-
-            return f"ERR: Command timed out after 300s. If starting a server, run it in background with '{background_hint()}'"
-
-        out = stdout.decode("utf-8", errors="replace").strip()
-        err = stderr.decode("utf-8", errors="replace").strip()
+        # Format output from SkillExecutionOutcome
+        out = str(result.result) if result.result else ""
+        err = result.error or ""
 
         if len(out) > 50000:
             out = out[:50000] + "\n... [STDOUT TRUNCATED]"
         if len(err) > 50000:
             err = err[:50000] + "\n... [STDERR TRUNCATED]"
 
-        if proc.returncode != 0:
-            return f"EXIT CODE: {proc.returncode}\nSTDOUT:\n{out}\nSTDERR:\n{err}"
-        return f"STDOUT:\n{out}" if out else "SUCCESS: (No output)"
+        # Add warnings to output if any
+        warning_msg = ""
+        if warnings:
+            warning_msg = (
+                "WARNINGS:\n" + "\n".join(f"  - {w}" for w in warnings) + "\n\n"
+            )
+
+        if not result.success:
+            return f"{warning_msg}EXIT CODE: {result.error_type.value if result.error_type else '1'}\nSTDOUT:\n{out}\nSTDERR:\n{err}"
+        return (
+            f"{warning_msg}STDOUT:\n{out}"
+            if out
+            else f"{warning_msg}SUCCESS: (No output)"
+        )
 
     except Exception as e:
         return f"ERR: bash execution failed: {e}"
-
-
-def _build_sandbox_env(extra_env: dict[str, str] | None = None) -> dict[str, str]:
-    """构建沙箱环境变量。
-
-    优先级（从低到高）:
-    1. 系统环境变量（白名单）
-    2. 配置文件中的环境变量（pip 镜像、providers 等）
-    3. Sandbox 虚拟环境（如果可用，已包含步骤 2）
-    4. 调用者传入的自定义环境变量
-
-    Returns:
-        环境变量字典
-    """
-    from core.utils.platform import filter_env_by_whitelist
-
-    env = filter_env_by_whitelist()
-
-    # 2 & 3. 注入 Sandbox 环境（如果可用，已含 _config_env_vars）
-    sandbox_ok = False
-    try:
-        from core.skill.execution.sandbox import get_sandbox
-
-        sandbox = get_sandbox()
-        if hasattr(sandbox, "get_sandbox_env"):
-            sandbox_env = sandbox.get_sandbox_env()
-            env.update(sandbox_env)
-            sandbox_ok = True
-    except Exception:
-        pass
-
-    # Sandbox 不可用时，仍注入配置中的环境变量（pip 镜像等）
-    if not sandbox_ok:
-        try:
-            from core.skill.execution.sandbox.uv import _config_env_vars
-
-            env.update(_config_env_vars())
-        except Exception:
-            pass
-
-    # 3. 注入全局配置 env（优先级高于系统，低于调用者）
-    try:
-        from middleware.config import g_config
-
-        cfg_env = getattr(g_config, "env", None)
-        if isinstance(cfg_env, dict):
-            env.update({str(k): str(v) for k, v in cfg_env.items()})
-    except Exception:
-        pass
-
-    # 4. 注入调用者传入的自定义环境（最高优先级）
-    if extra_env:
-        env.update(extra_env)
-
-    return env
-
-
-def _select_shell(command: str) -> list[str] | None:
-    if os.name == "nt":
-        return None
-
-    if has_bash():
-        return ["bash", "-lc", command]
-
-    return ["sh", "-c", command]
-
-
-def _rewrite_python_command(command: str, python_path: str) -> str:
-    if not command:
-        return command
-
-    import re
-
-    def _replace(match: re.Match) -> str:
-        prefix = match.group("prefix") or ""
-        cmd = match.group("cmd")
-        rest = match.group("rest") or ""
-        if cmd == "pip":
-            return f'{prefix}"{python_path}" -m pip{rest}'
-        return f'{prefix}"{python_path}"{rest}'
-
-    pattern = re.compile(
-        r"(?P<prefix>^|[;&|]\s*)(?P<cmd>python3|python|py|pip)(?P<rest>\s+|-m\s+|$)"
-    )
-
-    return pattern.sub(_replace, command)
-
-
-def _rewrite_uv_pip_command(command: str, env: dict[str, str]) -> str:
-    """Rewrite uv pip install command to use mirror index URLs."""
-    if not command or "uv pip install" not in command:
-        return command
-
-    # Already has --index-url, skip
-    if "--index-url" in command:
-        return command
-
-    # Get mirror URLs from environment
-    index_url = env.get("UV_PIP_INDEX_URL") or env.get("PIP_INDEX_URL")
-    extra_index = env.get("UV_PIP_EXTRA_INDEX_URL") or env.get("PIP_EXTRA_INDEX_URL")
-
-    if not index_url:
-        return command
-
-    # Build mirror arguments
-    mirror_args = f'--index-url "{index_url}"'
-    if extra_index:
-        for url in extra_index.split():
-            mirror_args += f' --extra-index-url "{url}"'
-
-    # Insert after "uv pip install"
-    import re
-
-    # Match: uv pip install [options] package...
-    pattern = r"(uv\s+pip\s+install)(\s+)(.*)"
-
-    def _replace(match: re.Match) -> str:
-        cmd = match.group(1)
-        space = match.group(2)
-        rest = match.group(3)
-        return f"{cmd}{space}{mirror_args} {rest}"
-
-    return re.sub(pattern, _replace, command)

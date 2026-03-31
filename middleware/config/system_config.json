@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "app": {
     "name": "Memento-S",
     "theme_options": {
@@ -32,13 +32,14 @@
     "github_mirrors": [
       "https://gh-proxy.com/"
     ],
-    "cloud_catalog_url": "http://8.140.204.114:9001/",
+    "cloud_catalog_url": "https://skills.yangtzeailab.com/",
     "retrieval": {
       "top_k": 5,
       "min_score": 0.012,
       "embedding_model": "Qwen3-Embedding-4B",
-      "embedding_base_url": "http://45.120.102.120:20002/v1",
-      "embedding_api_key": null,
+      "embedding_dimension": 2560,
+      "embedding_base_url": "https://skills.yangtzeailab.com/api/v1",
+      "embedding_api_key": "sk-xxxxxx",
       "reranker_enabled": true,
       "reranker_min_score": 0.001
     },
@@ -49,11 +50,9 @@
       "uv_python_version": "3.12",
       "bash_timeout_sec": 300,
       "pip_install_timeout_sec": 180,
-      "cli_install_timeout_sec": 300
-    },
-    "strategy": {
-      "resolve_strategy": "local_first",
-      "download_method": "auto"
+      "cli_install_timeout_sec": 300,
+      "max_attempts": 3,
+      "same_signature_limit": 2
     }
   },
   "paths": {
@@ -70,7 +69,18 @@
   "agent": {
     "max_iterations": 100
   },
+  "gateway": {
+    "enabled": true,
+    "mode": "gateway",
+    "websocket_host": "127.0.0.1",
+    "websocket_port": 8765,
+    "webhook_host": "127.0.0.1",
+    "webhook_port": 18080
+  },
   "ota": {
-    "url": "http://127.0.0.1:8000/api/v1/check_for_updates"
+    "url": "https://ota.yangtzeailab.com/api/v1/check_for_updates"
+  },
+  "auth": {
+    "base_url": "https://ota.yangtzeailab.com/"
   }
 }

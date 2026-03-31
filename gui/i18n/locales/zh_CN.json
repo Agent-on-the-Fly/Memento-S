@@ -37,6 +37,15 @@
   "toolbar": {
     "new_conversation": "新对话",
     "model_settings": "模型设置",
+    "search_models": "搜索模型...",
+    "add_model": "添加模型",
+    "edit_model": "编辑模型",
+    "delete_model_tooltip": "删除模型",
+    "finish_editing": "完成编辑",
+    "no_matching_models": "未找到匹配的模型",
+    "cannot_delete_last_model": "不能删除最后一个模型",
+    "model_deleted": "模型 '{name}' 已删除",
+    "delete_model_failed": "删除模型失败: {error}",
     "tooltip": {
       "clear": "清空对话 (Ctrl+L)",
       "export": "导出对话",
@@ -60,6 +69,7 @@
       "llm": "大模型",
       "skills": "技能",
       "storage": "存储",
+      "im": "IM",
       "advanced": "高级"
     },
     "fields": {
@@ -95,7 +105,18 @@
       "search": "搜索",
       "skills": "技能",
       "storage": "存储",
-      "advanced": "高级"
+      "advanced": "高级",
+      "enabled": "启用",
+      "app_id": "App ID",
+      "app_secret": "App Secret",
+      "app_key": "App Key",
+      "corp_id": "Corp ID",
+      "agent_id": "Agent ID",
+      "secret": "Secret",
+      "encrypt_key": "加密密钥",
+      "verification_token": "验证令牌",
+      "webhook_url": "Webhook URL",
+      "platform": "平台"
     },
     "theme_options": {
       "system": "跟随系统",
@@ -228,6 +249,8 @@
     "delete_conversation_msg": "确定要删除这个对话吗？此操作无法撤销。",
     "delete_session_title": "删除会话",
     "delete_session_msg": "确定要删除这个会话吗？此操作无法撤销。",
+    "delete_model_title": "确认删除",
+    "delete_model_msg": "确定要删除模型 '{name}' 吗？\n此操作不可撤销。",
     "rename_conversation_title": "重命名对话",
     "rename_session_title": "重命名会话",
     "new_title_label": "新标题",
@@ -320,6 +343,9 @@
     "not_implemented": "导出功能待实现"
   },
   "settings_panel": {
+    "account": "账户",
+    "not_logged_in": "未登录",
+    "login_hint": "登录以同步你的设置和数据",
     "appearance": "外观设置",
     "language": "语言",
     "theme": "主题",
@@ -359,8 +385,22 @@
       "llm": "大模型",
       "skills": "技能",
       "storage": "存储",
+      "im": "IM",
       "advanced": "高级",
       "raw": "原始配置"
+    },
+    "im": {
+      "description": "配置即时通讯平台接入，支持微信、飞书、钉钉、企业微信",
+      "gateway_title": "Gateway 配置",
+      "gateway_enabled": "启用 Gateway",
+      "gateway_disabled_hint": "请先启用 Gateway 以配置 IM 平台",
+      "gateway_error_title": "启动失败",
+      "platforms": {
+        "wechat": "微信 (WeChat)",
+        "feishu": "飞书 (Feishu)",
+        "dingtalk": "钉钉 (DingTalk)",
+        "wecom": "企业微信 (WeCom)"
+      }
     },
     "fields": {
       "model": "模型",
@@ -421,8 +461,12 @@
     "confirm": "确认"
   },
   "update": {
+    "available": "有新版本可用",
+    "new_version": "新版本: {version}",
+    "current_version": "当前版本: {version}",
     "downloading": "正在下载更新",
     "downloading_desc": "正在下载最新版本，请稍候...",
+    "starting_download": "正在开始下载...",
     "cancelled": "下载已取消",
     "ready_title": "更新已就绪",
     "ready_desc": "版本 {version} 已下载完成，是否立即安装？",
@@ -433,11 +477,63 @@
     "restart_and_install": "重启并安装",
     "installing": "正在安装更新",
     "installing_desc": "正在安装更新，应用即将重启...",
-    "install_complete": "更新安装完成"
+    "install_complete": "安装脚本已启动，应用即将重启",
+    "update_now": "立即更新",
+    "check_failed": "检查更新失败",
+    "check_failed_detail": "检查更新失败: {error}",
+    "already_latest": "当前已是最新版本",
+    "release_notes_label": "更新说明: {notes}",
+    "update_hint": "{platform} 有新版本可用，点击「立即更新」下载并自动安装。",
+    "install_later_hint": "更新将稍后安装",
+    "manager_not_initialized": "更新管理器未初始化",
+    "install_failed": "安装失败",
+    "download_failed": "下载失败",
+    "blocked_translocated": "当前处于隔离环境，无法升级。请将应用移到 Applications 后重新打开。",
+    "force_update_title": "强制更新",
+    "force_update_desc": "该更新为强制更新，必须完成更新后才能继续使用。",
+    "force_update_downloading": "正在下载必要更新，请稍候...",
+    "download_now": "立即下载"
   },
   "common": {
     "cancel": "取消",
     "later": "稍后",
     "close": "关闭"
+  },
+  "auth": {
+    "login": "登录",
+    "click_to_login": "点击登录",
+    "account": "账号",
+    "account_hint": "请输入手机号/邮箱",
+    "verification_code": "验证码",
+    "code_hint": "请输入验证码",
+    "send_code": "发送验证码",
+    "code_sent": "验证码已发送",
+    "resend_after": "{seconds}s 后重发",
+    "logging_in": "登录中...",
+    "login_success": "登录成功",
+    "login_failed": "登录失败: {error}",
+    "logged_in_as": "已登录: {user}",
+    "send_code_failed": "发送验证码失败: {error}",
+    "account_required": "请输入账号",
+    "code_required": "请输入验证码",
+    "logout": "退出登录",
+    "logout_success": "已退出登录",
+    "logout_failed": "退出登录失败: {error}"
+  },
+  "file_browser": {
+    "search_hint": "搜索文件...",
+    "workspace_not_exist": "工作空间不存在",
+    "menu": {
+      "copy_path": "复制路径",
+      "open_in_folder": "在文件夹中打开",
+      "delete": "删除"
+    },
+    "dialog": {
+      "delete_title": "确认删除",
+      "delete_content": "确定要删除 {name} 吗？",
+      "cancel": "取消",
+      "confirm_delete": "删除"
+    },
+    "tooltip": "文件浏览器"
   }
 }

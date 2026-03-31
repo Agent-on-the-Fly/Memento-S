@@ -1,6 +1,4 @@
-"""
-Search tool: grep for files or text.
-"""
+"""Search tool: grep for files or text."""
 
 from __future__ import annotations
 
@@ -11,8 +9,8 @@ import fnmatch
 from pathlib import Path
 from typing import Optional
 
-from ._base import _resolve_path, _IGNORE_DIRS
 from middleware.config import g_config
+from middleware.utils.path_security import IGNORE_DIRS
 
 
 async def grep_tool(
@@ -21,7 +19,6 @@ async def grep_tool(
     file_pattern: str = "*",
     text: Optional[str] = None,
     show_line_numbers: bool = True,
-    base_dir: str | None = None,
 ) -> str:
     """
     Search for a regex pattern in files or text.
@@ -31,7 +28,7 @@ async def grep_tool(
 
     Args:
         pattern: The Python regex pattern to search for.
-        dir_path: The directory to search in (used when text is None).
+        dir_path: The directory to search in (absolute path, pre-validated).
         file_pattern: Glob pattern to filter files (e.g., "*.py", "*.ts").
         text: If provided, search within this text string instead of files.
         show_line_numbers: Whether to show line numbers in results (default True).
@@ -66,15 +63,15 @@ async def grep_tool(
 
         # Search in files
         try:
-            base = Path(base_dir).resolve() if base_dir else None
-            target = _resolve_path(dir_path, base)
+            # Path is pre-validated by ToolContext as absolute path
+            target = Path(dir_path)
             regex = re.compile(pattern)
             results = []
             max_matches = 100
 
             for root, dirs, files in os.walk(target):
                 dirs[:] = [
-                    d for d in dirs if d not in _IGNORE_DIRS and not d.startswith(".")
+                    d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")
                 ]
                 for file in files:
                     if not fnmatch.fnmatch(file, file_pattern):
@@ -98,12 +95,7 @@ async def grep_tool(
                         ).splitlines()
                         for i, line in enumerate(lines):
                             if regex.search(line):
-                                rel_base = (
-                                    Path(base_dir).resolve()
-                                    if base_dir
-                                    else Path(g_config.paths.workspace_dir)
-                                )
-                                rel_path = filepath.relative_to(rel_base)
+                                rel_path = filepath.relative_to(target)
                                 results.append(f"{rel_path}:{i + 1}: {line.strip()}")
                                 if len(results) >= max_matches:
                                     results.append(
