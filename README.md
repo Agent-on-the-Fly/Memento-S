@@ -350,8 +350,8 @@ Download the pre-built desktop app — no Python or terminal needed. Just unzip 
 
 | Platform | Download |
 | --- | --- |
-| **macOS** (Apple Silicon) | [memento-s-mac-arm64.zip](https://memento-s.oss-cn-shanghai.aliyuncs.com/memento-s-mac-arm64.zip) |
-| **Windows** (x64) | [memento-s-win-x64.zip](https://memento-s.oss-cn-shanghai.aliyuncs.com/memento-s-win-x64.zip) |
+| **macOS** (Apple Silicon) | [memento-s-mac-arm64.zip](https://delta-bucket-prod-public.oss-cn-hangzhou.aliyuncs.com/app_versions/mac/arm64/0.3.1/Memento-S-0.3.1-arm64.dmg) |
+| **Windows** (x64) | [memento-s-win-x64.zip](https://delta-bucket-public.yangtzeailab.com/memento-s/Memento-S-win-x64-0.3.1.zip) |
 
 > After unzipping, open the app and fill in your LLM API key in the settings page. That's it — you're ready to go.
 
