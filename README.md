@@ -2,6 +2,39 @@
 
 <h3 align="center"><b>Deploy an agent. Let it learn, rewrite, and evolve its own skills.</b></h3>
 
+<a id="desktop-app-launch"></a>
+<table>
+<tr>
+<td align="center">
+
+<h2>Memento-S Desktop App Is Live</h2>
+
+<p><b>The agent that learns, stores skills, and improves through real tasks is now available as a desktop app.</b></p>
+
+<p>
+You no longer need to start Memento-S from source. Windows and macOS users can install the app directly and try desktop chat, file and document handling, web research, multi-step task execution, skill calls, and reflection-based self-improvement.
+</p>
+
+<p>
+During the launch period, new app users can receive a generous token package for long tasks, multi-turn collaboration, and agent reflection workflows. Check the app for the latest campaign details.
+</p>
+
+<p align="center">
+  <a href="https://drive.google.com/file/d/1YqiW8XbQkm1oxAdI60hplOUBW77UGTD0/view?usp=sharing"><img src="https://img.shields.io/badge/Download-Windows-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows"></a>
+  <a href="https://drive.google.com/file/d/1FCVmcromh0V8JKBSt1LEqvqMAe6mOAKh/view?usp=sharing"><img src="https://img.shields.io/badge/Download-macOS-111827?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+  <a href="docs/MEMENTO_APP_LAUNCH_PR.md"><img src="https://img.shields.io/badge/Read-Launch%20Announcement-ff6f00?style=for-the-badge" alt="Read launch announcement"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Desktop%20App-Live-16a34a?style=flat-square" alt="Desktop app live">
+  <img src="https://img.shields.io/badge/Launch%20Offer-Token%20Gift-ca8a04?style=flat-square" alt="Launch token gift">
+  <img src="https://img.shields.io/badge/Updates-In%20App-0284c7?style=flat-square" alt="In-app updates">
+</p>
+
+</td>
+</tr>
+</table>
+
 <p align="center">
   <img src="https://img.shields.io/badge/Version-0.3.0-blue?style=for-the-badge" alt="Version 0.3.0">
   <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python 3.12+">
@@ -21,6 +54,7 @@
 </p>
 
 <p align="center">
+  <a href="#desktop-app-launch">App Launch</a> ·
   <a href="#-whats-new-in-v030">What's New</a> ·
   <a href="#-learning-results">Learning Results</a> ·
   <a href="#-one-click-gui-install">Install</a> ·
@@ -346,14 +380,18 @@ python -m venv .venv && source .venv/bin/activate && pip install -e . && memento
 
 ## One-Click GUI Install
 
-Download the pre-built desktop app — no Python or terminal needed. Just unzip and run.
+Download the pre-built desktop app — no Python or terminal needed. Install the package for your platform and start using Memento-S directly.
+
+The desktop app is now the recommended path for most users. We will keep shipping product updates through the app, while this repository remains available for developers who want to inspect, extend, or run the source code.
 
 | Platform | Download |
 | --- | --- |
-| **macOS** (Apple Silicon) | [memento-s-mac-arm64.zip](https://delta-bucket-prod-public.oss-cn-hangzhou.aliyuncs.com/app_versions/mac/arm64/0.3.1/Memento-S-0.3.1-arm64.dmg) |
-| **Windows** (x64) | [memento-s-win-x64.zip](https://delta-bucket-public.yangtzeailab.com/memento-s/Memento-S-win-x64-0.3.1.zip) |
+| **Windows** | [Download for Windows](https://drive.google.com/file/d/1YqiW8XbQkm1oxAdI60hplOUBW77UGTD0/view?usp=sharing) |
+| **macOS** | [Download for Mac](https://drive.google.com/file/d/1FCVmcromh0V8JKBSt1LEqvqMAe6mOAKh/view?usp=sharing) |
 
-> After unzipping, open the app and fill in your LLM API key in the settings page. That's it — you're ready to go.
+> Launch offer: new app users can receive a generous token package during the launch period. Open the app to check the latest campaign details.
+
+> For source-based development, continue with the developer quick start below.
 
 ## Quick Start (Developer)
 
