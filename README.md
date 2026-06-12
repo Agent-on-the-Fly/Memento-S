@@ -36,7 +36,7 @@ During the launch period, new app users can receive a generous token package for
 </table>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.3.0-blue?style=for-the-badge" alt="Version 0.3.0">
+  <img src="https://img.shields.io/badge/Version-0.3.8-blue?style=for-the-badge" alt="Version 0.3.8">
   <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/Skills-10%20built--in-0f766e" alt="10 built-in skills">
   <img src="https://img.shields.io/badge/Framework-Fully%20Self--Developed-b91c1c" alt="Fully self-developed framework">
@@ -55,7 +55,7 @@ During the launch period, new app users can receive a generous token package for
 
 <p align="center">
   <a href="#desktop-app-launch">App Launch</a> ·
-  <a href="#-whats-new-in-v030">What's New</a> ·
+  <a href="#-whats-new-in-v038">What's New</a> ·
   <a href="#-learning-results">Learning Results</a> ·
   <a href="#-one-click-gui-install">Install</a> ·
   <a href="#-quick-start-developer">Quick Start</a> ·
@@ -87,6 +87,19 @@ During the launch period, new app users can receive a generous token package for
 <p align="center"><sub>The architecture of the Self-Evolving Agent based on Read-Write Reflective Learning. When a user submits a task, the agent uses a skill router to either retrieve an executable skill from its skill library or generate a new one from scratch, which it then executes to solve the problem. Following execution, the system reflects on the outcome to write back to the library, either by increasing the skill's utility score if the action was successful, or by optimising its underlying skill folders if it failed. This continuous read-write loop enables the agent to progressively expand and refine its capabilities through continual learning, entirely without updating the underlying LLM parameters.</sub></p>
 </td></tr>
 </table>
+
+---
+
+## What's New in v0.3.8
+
+> **v0.3.8** publishes the Memento-S desktop app as the recommended path for most users. Windows and macOS builds are now available directly from the README, with future product updates continuing through the app.
+
+| Update | Description |
+| --- | --- |
+| **Desktop app launch** | Memento-S can now be installed directly on Windows and macOS without setting up Python or launching from source. |
+| **Top-level launch banner** | The README now opens with a clear app launch announcement, download buttons, and launch offer messaging. |
+| **Launch announcement** | A standalone English announcement is available at [`docs/MEMENTO_APP_LAUNCH_PR.md`](docs/MEMENTO_APP_LAUNCH_PR.md) for external publishing. |
+| **Launch offer** | New app users can receive a generous token package during the launch period. Check the app for current campaign details. |
 
 ---
 

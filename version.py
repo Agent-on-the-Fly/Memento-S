@@ -1,5 +1,5 @@
 # Version information for Memento-S
-__version__ = "0.3.0"
+__version__ = "0.3.8"
 version = __version__
 
 file_description = "Memento-S"
