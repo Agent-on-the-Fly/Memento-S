@@ -22,7 +22,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
-      MEMENTO_HOME: ${{ runner.temp }}/memento_s
       PYTHONDONTWRITEBYTECODE: "1"
 
     steps:
@@ -50,6 +49,8 @@ jobs:
       - name: Check licensing and source layout
         run: python scripts/check_release_readiness.py
       - name: Run deterministic smoke suite
+        env:
+          MEMENTO_HOME: ${{ runner.temp }}/memento_s
         run: >-
           python -m pytest -p no:cacheprovider -q
           core/skill/tests/schema/test_skill_model.py
