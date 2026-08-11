@@ -83,7 +83,7 @@ async def main():
         "画一个数据可视化图表",
         "帮我搜索最新新闻",
         "生成一个流程图",
-        "pdf",
+        "filesystem",
         "web_search",
     ]
 
@@ -103,14 +103,14 @@ async def main():
 
     # ── 3. search 云端 skill → execute 本地已有 ──────────────
 
-    print("\n\n【3. search → execute 本地 skill (pdf)】")
-    results = provider.search("pdf", k=3)
+    print("\n\n【3. search → execute 本地 skill (filesystem)】")
+    results = provider.search("filesystem", k=3)
     chosen = results[0]
     print(f"  选择: {chosen.name} (source={chosen.source})")
 
     exec_result = await provider.execute(
         skill_name=chosen.name,
-        params={"request": "读取PDF文件的内容"},
+        params={"request": "列出当前工作区的文件"},
     )
     print(f"  execute: ok={exec_result.ok}, skill={exec_result.skill_name}")
     if exec_result.ok:

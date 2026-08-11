@@ -1,5 +1,9 @@
 # Memento-S Skill Executor ReAct 过程深度分析
 
+> Historical execution trace. The presentation skill used in this document is
+> not bundled with the Apache-2.0 distribution. Install only external skills
+> whose licenses and provenance you have reviewed.
+
 > 日志来源: `/Users/manson/memento_s/logs/app_2026-03-27.log`
 > 分析日期: 2026-03-27
 

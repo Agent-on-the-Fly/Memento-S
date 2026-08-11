@@ -92,7 +92,7 @@ class TestLocalRecall:
             pytest.skip("Skills directory not available")
 
         # 已知能匹配的 query
-        candidates_match = await local_recall.search("pdf", k=10)
+        candidates_match = await local_recall.search("filesystem", k=10)
         # 不匹配的 query
         candidates_empty = await local_recall.search("xyznonexistent12345", k=10)
 

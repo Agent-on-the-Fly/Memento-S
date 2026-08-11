@@ -1,5 +1,9 @@
 # Memento-S Agent 完整执行流程分析
 
+> Historical architecture trace. Its PDF examples refer to an external skill that
+> is not bundled with the Apache-2.0 distribution. Install only skills whose
+> licenses and provenance you have reviewed.
+
 ## 概述
 
 本文档详细分析了一个完整的 Agent 任务执行流程，从用户输入到任务完成的整个过程。以"使用 pdf skill 创建 PDF 文件"为例，展示系统各组件的协作机制。

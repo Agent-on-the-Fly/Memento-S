@@ -18,7 +18,6 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -86,22 +85,13 @@ def login(
         )
     )
 
-    # Check if SDK is available
-    # First try local 3rd party version
-    _3RD_DIR = _PROJECT_ROOT / "3rd"
-    if str(_3RD_DIR) not in sys.path:
-        sys.path.insert(0, str(_3RD_DIR))
-
     try:
         from weixin_sdk.auth.qr_login import QRLoginManager
-        from weixin_sdk import DEFAULT_BASE_URL
-
-        logger.info("Using weixin_sdk from local 3rd/ directory")
     except ImportError:
         console.print("[red]Error: weixin_sdk not found.[/red]")
-        console.print("[dim]Please ensure 3rd/weixin_sdk exists or install with:[/dim]")
         console.print(
-            "  uv pip install -e C:\\Users\\75484\\src\\openclaw-weixin-python"
+            "[dim]Install a separately licensed WeChat SDK in the active "
+            "environment to enable this optional integration.[/dim]"
         )
         raise typer.Exit(1)
 
@@ -197,11 +187,6 @@ async def _verify_token(base_url: str, token: str) -> tuple[bool, str]:
     Returns:
         (is_valid, message): 是否有效及状态消息
     """
-    # Add 3rd party SDK to path
-    _3RD_DIR = _PROJECT_ROOT / "3rd"
-    if str(_3RD_DIR) not in sys.path:
-        sys.path.insert(0, str(_3RD_DIR))
-
     try:
         from weixin_sdk import WeixinClient
         from weixin_sdk.exceptions import WeixinSessionExpiredError, WeixinAPIError

@@ -1,7 +1,27 @@
 [project]
 name = "memento-s"
 version = "0.3.8"
-description = "Memento-S Agent"
+description = "A skill-centric runtime for persistent and extensible LLM agents"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
+authors = [
+    { name = "Memento-Skills contributors" },
+]
+keywords = [
+    "large-language-model-agents",
+    "agent-skills",
+    "procedural-memory",
+    "software-frameworks",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 requires-python = ">=3.12"
 dependencies = [
     "typer",
@@ -20,6 +40,7 @@ dependencies = [
     "markdownify",
     "aiohttp",
     "requests",
+    "certifi>=2023.7.22",
     "aiofiles",
     "anyio",
     "pyyaml",
@@ -38,10 +59,26 @@ dependencies = [
     "sqlite-vec>=0.1.0",
     "alembic>=1.12.0",
     "inflection>=0.5.1",
+    "jsonschema>=4.20.0",
     # IM Platform dependencies
     "websockets>=12.0",
     "lark-oapi>=1.0.0",
 ]
+
+[project.optional-dependencies]
+test = [
+    "build>=1.2.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+]
+
+[project.urls]
+Homepage = "https://memento.run/"
+Documentation = "https://github.com/Memento-Teams/Memento-Skills#readme"
+Repository = "https://github.com/Memento-Teams/Memento-Skills"
+Download = "https://memento.run/release"
+Issues = "https://github.com/Memento-Teams/Memento-Skills/issues"
 
 
 [project.scripts]
@@ -152,5 +189,27 @@ include = [
     "bootstrap.py",
     "pyproject.toml",
     "README.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md",
+    "CONTRIBUTING.md",
     "howto.md",
 ]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+asyncio_mode = "strict"
+markers = [
+    "smoke: fast checks for core functionality",
+    "slow: tests that invoke an LLM or process substantial data",
+    "integration: end-to-end tests requiring external services or credentials",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["core", "infra", "middleware", "shared", "tools", "utils"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

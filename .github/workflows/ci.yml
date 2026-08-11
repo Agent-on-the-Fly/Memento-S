@@ -1,0 +1,100 @@
+name: CI
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-tests:
+    name: Smoke tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      MEMENTO_HOME: ${{ runner.temp }}/memento_s
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+      - name: Install smoke-test dependencies
+        run: >-
+          python -m pip install
+          "pytest>=8,<10"
+          "pytest-asyncio>=0.23,<2"
+          "pytest-cov>=5,<8"
+          "litellm>=1.81.10"
+          "pydantic>=2"
+          "inflection>=0.5.1"
+          "python-frontmatter>=1.0"
+          "platformdirs>=4"
+          "loguru>=0.7"
+      - name: Validate installed dependencies
+        run: python -m pip check
+      - name: Check licensing and source layout
+        run: python scripts/check_release_readiness.py
+      - name: Run deterministic smoke suite
+        run: >-
+          python -m pytest -p no:cacheprovider -q
+          core/skill/tests/schema/test_skill_model.py
+          core/skill/tests/execution/loop/test_loop_detector.py
+          core/skill/tests/execution/state/test_react_state.py
+          tests/test_runtime_mode_paths.py
+          --cov=core.skill.schema
+          --cov=core.skill.execution.loop_detector
+          --cov=core.skill.execution.state
+          --cov=utils.runtime_mode
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+          --cov-report=html:htmlcov
+      - name: Publish smoke coverage report
+        uses: actions/upload-artifact@v6
+        with:
+          name: smoke-coverage-${{ matrix.os }}
+          path: |
+            coverage.xml
+            htmlcov/
+          if-no-files-found: error
+
+  distributions:
+    name: Build and inspect distributions
+    runs-on: ubuntu-latest
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+      - name: Install build frontend
+        run: python -m pip install build
+      - name: Build wheel and source archive
+        run: python -m build
+      - name: Inspect distribution contents
+        run: python scripts/check_release_readiness.py --dist dist
+      - name: Publish inspected distributions
+        uses: actions/upload-artifact@v6
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error

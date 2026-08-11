@@ -134,8 +134,8 @@ SKILLS_SECTION: Final[str] = """\
 
 **CRITICAL SYSTEM INSTRUCTION regarding the list below:**
 The items listed below are merely a text catalog of local skills. **THEY ARE NOT NATIVE TOOLS.** 
-You are STRICTLY FORBIDDEN from generating tool calls with the names of these skills directly (e.g., do NOT output `tool_call: pdf(...)`).
-To use a skill from this list, you MUST call the native `execute_skill` tool and pass the name as a parameter: `execute_skill(skill_name="pdf", request="...")`.
+You are STRICTLY FORBIDDEN from generating tool calls with the names of these skills directly (e.g., do NOT output `tool_call: filesystem(...)`).
+To use a skill from this list, you MUST call the native `execute_skill` tool and pass the name as a parameter: `execute_skill(skill_name="filesystem", request="...")`.
 
 ### Local Skill Catalog:
 {skills_summary}"""

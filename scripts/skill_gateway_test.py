@@ -464,7 +464,7 @@ class SkillGatewayTester:
         _log_step("Testing cloud search")
         start = time.perf_counter()
         try:
-            results = await self.gateway.search("pdf", k=10)
+            results = await self.gateway.search("data visualization", k=10)
             duration = (time.perf_counter() - start) * 1000
 
             # 检查结果是否包含云端结果
