@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """钉钉桥接 CLI 命令
 
 提供命令行入口启动钉钉桥接。

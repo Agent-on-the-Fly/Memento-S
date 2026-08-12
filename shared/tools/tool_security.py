@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared tool security utilities (utility layer).
 
 Provides IGNORE_DIRS for file traversal. All path boundary logic lives in

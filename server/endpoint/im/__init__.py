@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/endpoint/im/__init__.py
 统一 IM 接入层。

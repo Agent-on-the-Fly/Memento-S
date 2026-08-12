@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tool call filtering, enforcement, error policy, and result tracking."""
 
 from __future__ import annotations

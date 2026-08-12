@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """零 LLM 压缩策略 — Microcompact + SM Compact。
 
 Microcompact 委托 infra/shared/compact.py 处理（唯一真实来源）。

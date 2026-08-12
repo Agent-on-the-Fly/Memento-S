@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 IM 平台抽象协议与公共数据模型。
 

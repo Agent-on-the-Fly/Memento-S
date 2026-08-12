@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Cross-platform path manager for Memento-S.
 
 统一路径入口，内部委托给 RuntimeMode。

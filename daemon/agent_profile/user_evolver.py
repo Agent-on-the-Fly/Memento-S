@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """UserEvolver — USER.md evolution engine via dialectic multi-pass reasoning.
 
 Pass 0: Observation — cold start, comprehensive observation

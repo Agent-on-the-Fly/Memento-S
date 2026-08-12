@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skill_storage.py - SkillStorage 单元测试
 
 测试 SkillStorage 的所有功能：文件读写、注册表操作、同步。

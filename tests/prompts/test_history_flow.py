@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """集成测试 — core/context/history/manager.py: HistoryManager 两层窗口 + slim。"""
 
 from __future__ import annotations

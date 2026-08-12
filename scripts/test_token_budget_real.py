@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """真实场景 token 增长模拟（完整 token 计数）。
 
 运行方式:

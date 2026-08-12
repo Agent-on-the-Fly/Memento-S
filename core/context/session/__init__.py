@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """core.context.session — session-level runtime state (pure data schemas).
 
 Migrated from core/session/ — contains only pure data schemas and stateless helpers.

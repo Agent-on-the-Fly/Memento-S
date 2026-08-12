@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ArtifactRegistry — 跟踪所有创建的文件，防止幻觉。
 
 防幻觉核心机制：记录所有创建的文件路径和内容摘要，

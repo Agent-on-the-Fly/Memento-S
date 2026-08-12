@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MemoryConsolidationEngine — 唯一的整合引擎，只负责"怎么整合"。
 
 由 Dream、Agent 或独立后台循环触发。

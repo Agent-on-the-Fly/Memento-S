@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Workspace file browser widget with tree view and context menu
 Optimized with virtual scrolling - fixed control pool, no memory leaks

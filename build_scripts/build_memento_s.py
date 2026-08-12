@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 flet pack 打包脚本
 直接调用 flet_cli.commands.pack.Command，绕过顶层 flet CLI 解析器的限制

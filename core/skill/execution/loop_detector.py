@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Generic loop detection for ReAct execution.
 
 Detects various loop patterns based on tool usage behavior,

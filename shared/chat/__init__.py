@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared Chat — 统一的 Session 和 Conversation 管理.
 
 提供对 GUI、Agent、CLI、IM 等各层的统一数据访问接口.

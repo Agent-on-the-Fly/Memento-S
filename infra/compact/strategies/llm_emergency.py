@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """LLM 紧急压缩策略 — 全量 13 字段结构化摘要压缩。"""
 
 from __future__ import annotations

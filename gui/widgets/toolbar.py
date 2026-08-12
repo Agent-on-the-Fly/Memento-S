@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Toolbar widget with conversation title and actions
 """

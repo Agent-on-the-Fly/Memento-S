@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Test Agent with event collector - verifying if events can be captured from reply_stream.
 
 This test uses the event collector pattern (Scheme 2) to capture all events

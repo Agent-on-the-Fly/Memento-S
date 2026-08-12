@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Fallback 策略 — token-budget-aware group-aware-trim 最后防线。"""
 
 from __future__ import annotations

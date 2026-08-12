@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """shared/fs/monitor - 统一的文件监控接口。
 
 提供 FsMonitorProtocol 的默认实现：

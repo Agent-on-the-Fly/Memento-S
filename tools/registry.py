@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tool registry and execution engine.
 
 Provides a unified registry for all tools (atomic, MCP) with statistics,

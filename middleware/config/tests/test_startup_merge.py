@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 系统启动时 merge 端到端测试
 

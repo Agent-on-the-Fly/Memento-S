@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 middleware.llm — 统一 LLM 调用层
 

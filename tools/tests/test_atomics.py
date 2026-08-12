@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for atomic tools (tools/atomics/)."""
 
 from __future__ import annotations

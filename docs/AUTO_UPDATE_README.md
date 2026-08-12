@@ -62,28 +62,28 @@ ota:
 
 ## 文件说明
 
-### electron/electron/updater.ts
-Electron 内置自动更新器，基于 `electron-updater`，包含：
-- `AutoUpdater` - 主更新管理
+### `gui/modules/auto_update_manager.py`
+Python 自动更新管理器，包含：
+- `AutoUpdateManager` - 主更新管理
 - `UpdateStatus` - 更新状态枚举
 - `UpdateInfo` - 更新信息
 - `DownloadProgress` - 下载进度追踪
 
 主要方法：
-- `checkForUpdates()` - 检查更新
-- `downloadUpdate()` - 下载更新
-- `quitAndInstall()` - 安装更新并重启
+- `check_for_update()` - 检查更新
+- `download_update()` - 下载更新
+- `install_update()` - 安装更新并重启
 
-### electron/src/composables/useUpdater.ts
-Vue 3 更新通知 UI，包含：
-- `useUpdater()` - 更新通知组合式函数
+### `gui/modules/update_notifier.py`
+Flet 更新通知 UI，包含：
+- `UpdateNotifier` - 连接更新状态与 Flet 对话框、进度条和通知卡片
 
 主要功能：
 - 显示下载进度对话框
 - 下载完成通知卡片
 - 安装确认对话框
 
-### middleware/config/config_models.py
+### `middleware/config/schemas/config_models.py`
 扩展的 OTA 配置模型：
 - `OTAConfig` - 新增自动更新相关配置
 
@@ -153,27 +153,26 @@ Vue 3 更新通知 UI，包含：
 
 ## 测试命令
 
-```typescript
-// Electron 中手动触发更新检查
-import { autoUpdater } from 'electron-updater';
-autoUpdater.checkForUpdates();
+```python
+from gui.modules.auto_update_manager import AutoUpdateManager
+
+# 在已初始化的 Flet 应用事件循环中调用：
+update = await AutoUpdateManager().manual_check_for_update()
 ```
 
 ```bash
-# 在 Electron 源码目录中运行
-cd electron && npm run build:mac    # macOS
-cd electron && npm run build:win    # Windows
-cd electron && npm run build:linux  # Linux
+# 无需凭证或 OTA 服务的源码级检查
+python -m compileall -q gui/modules
+python -c "from gui.modules.auto_update_manager import AutoUpdateManager"
 ```
 
 ## 测试与演示
 
-Electron 内置 `electron-updater` 的测试通过实际构建流程验证：
+更新模块随 Python wheel 构建，并由跨平台 installed-package CI 做导入检查。
+完整的下载和安装流程需要测试 OTA 服务与平台安装包，应在隔离测试环境中验证：
 
 ```bash
-# 1. 构建应用
-cd electron && npm ci && npm run build:mac
-
-# 2. electron-updater 会自动检测更新（需配置 OTA 服务器 URL）
-# 3. 查看 electron-updater 日志验证更新流程
+# 1. 使用 pyproject.toml 中的 Flet 配置构建目标平台应用
+# 2. 指向测试 OTA 服务器并发布带 checksum 的测试更新
+# 3. 在目标平台验证下载、校验、安装、重启和回滚行为
 ```

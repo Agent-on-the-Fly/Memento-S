@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Lifecycle classifier for file change detection.
 
 Classifies files as TEMPORARY, ARTIFACT, or UNKNOWN based on

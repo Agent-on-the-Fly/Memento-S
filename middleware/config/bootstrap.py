@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Config subsystem bootstrap — orchestrates initialization of all config layers.
 

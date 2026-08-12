@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Conversation controller - manages Session and Conversation lifecycle for GUI.
 
 Architecture:

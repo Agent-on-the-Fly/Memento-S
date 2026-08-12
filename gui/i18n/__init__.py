@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 国际化模块 - 与项目 Config 系统集成
 """

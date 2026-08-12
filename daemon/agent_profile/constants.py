@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Constants for AgentProfileEvolver."""
 
 # USER.md 定时进化间隔

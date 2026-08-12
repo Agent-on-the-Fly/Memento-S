@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Gateway 渠道适配器离线测试。
 

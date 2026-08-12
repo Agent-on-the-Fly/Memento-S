@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Pytest 配置文件
 
 注册自定义标记和全局 fixtures。

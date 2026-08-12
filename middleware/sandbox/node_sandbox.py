@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Node.js sandbox — simplified, no .nvenv directory required.
 
 Uses the system Node.js and relies on the Node.js ecosystem's native module

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """File change detection module.
 
 Provides unified file change detection, lifecycle classification,

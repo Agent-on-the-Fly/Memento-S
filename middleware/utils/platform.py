@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Platform capability detection for the execution layer.
 """

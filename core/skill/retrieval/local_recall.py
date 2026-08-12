@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """local_recall — 基于注册表的本地关键词召回
 
 读取 SkillRegistry 获取本地 skill 列表，

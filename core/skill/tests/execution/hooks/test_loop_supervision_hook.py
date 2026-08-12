@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for LoopSupervisionHook — core/skill/execution/hooks/loop_supervision.py"""
 
 from __future__ import annotations

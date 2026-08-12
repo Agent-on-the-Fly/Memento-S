@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """压缩机制集成测试（使用新架构 compaction.py）。
 
 运行方式:

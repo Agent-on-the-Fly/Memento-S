@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """通用代码解析工具"""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Notification Manager - 跨模块通知系统
 
 用于从后台线程（如 Gateway）向 GUI 发送通知。

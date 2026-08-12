@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for SkillToolAdapter — core/skill/execution/adapter.py"""
 
 from __future__ import annotations

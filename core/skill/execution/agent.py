@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SkillAgent — ReAct agent for skill execution.
 
 Delegates atomic tool execution to SkillToolAdapter, keeping the agent

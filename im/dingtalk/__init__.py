@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """钉钉桥接模块
 
 提供钉钉平台的 Agent 桥接实现。

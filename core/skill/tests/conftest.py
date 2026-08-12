@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skills 根 conftest - 所有 skill 测试共享的 fixtures
 
 提供真实配置和常用 fixtures，不使用 mock。

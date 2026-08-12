@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill tool schemas and unified execution gateway.
 
 Skill tool schemas define the function-calling interface exposed to the LLM agent.

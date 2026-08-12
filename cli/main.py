@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CLI for the Memento-S agent."""
 
 # Suppress litellm logging before any imports
@@ -44,8 +45,8 @@ except ImportError:
 
         __version__ = _pkg_version("memento-s")
     except Exception as e:
-        print(f"[Warning] Failed to get version, defaulting to 0.2.0: {e}")
-        __version__ = "0.2.0"
+        print(f"[Warning] Failed to get version; using 0+unknown: {e}")
+        __version__ = "0+unknown"
 
 app = typer.Typer(name="MementoS", help="Memento-S Agent CLI", no_args_is_help=True)
 console = Console()

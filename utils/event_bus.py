@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Event Bus - 简单的事件发布/订阅系统
 
 用于跨层通信，保持架构清晰：

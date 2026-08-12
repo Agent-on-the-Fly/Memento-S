@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """策略模式基类 — 所有压缩策略的抽象基类。"""
 
 from __future__ import annotations

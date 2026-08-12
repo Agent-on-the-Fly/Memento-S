@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill 模块配置定义
 
 提供 Skill 模块所需的所有配置，解耦与 middleware.config 的直接依赖。

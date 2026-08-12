@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Agent phase modules — each phase is a standalone async function.
 
 Import order matters: each line only depends on modules already loaded above.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Lifecycle policy engine for file change detection.
 
 Decides what to do with files based on their lifecycle classification

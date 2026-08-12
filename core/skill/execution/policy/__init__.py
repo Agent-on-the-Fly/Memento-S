@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Execution policy modules organized by lifecycle stage."""
 
 from .types import PolicyDecision, PolicyStage, RecoveryAction, RecoveryDecision

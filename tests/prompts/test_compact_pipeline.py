@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """集成测试 — infra/compact/pipeline.py: CompactPipeline 各压缩策略验证。"""
 
 from __future__ import annotations

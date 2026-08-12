@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ContextManager — Agent 唯一的上下文管理接口。
 
 Public API:

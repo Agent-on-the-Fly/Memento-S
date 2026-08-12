@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/schema/chat.py
 聊天相关 Pydantic 模型

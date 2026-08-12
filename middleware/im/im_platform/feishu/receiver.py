@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 飞书长链接（WebSocket）消息接收器。
 

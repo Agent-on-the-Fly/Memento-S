@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 飞书渠道适配器。
 

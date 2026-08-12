@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill market service - search/install/uninstall skills via remote catalog."""
 
 from __future__ import annotations

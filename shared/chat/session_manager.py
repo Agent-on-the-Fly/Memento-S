@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Session Manager — Session 生命周期管理.
 
 管理 Session 的创建、查询、更新和删除.

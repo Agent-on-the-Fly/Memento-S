@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 轻量级异步 HTTP 客户端封装。
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Storage services with automatic database session management."""
 
 from .base_service import BaseService

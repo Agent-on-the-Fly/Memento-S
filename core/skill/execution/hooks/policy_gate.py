@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PolicyGateHook — ToolGate 的 Hook 化改造，统一 Policy 策略入口。
 
 将 SkillToolAdapter 内独立的 ToolGate.check() 调用重构为 HookDefinition，

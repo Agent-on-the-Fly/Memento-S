@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared tools module — cross-module utility layer for tool-related logic.
 
 Single source of truth for:

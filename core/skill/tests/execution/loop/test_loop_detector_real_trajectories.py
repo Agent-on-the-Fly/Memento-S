@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Integration tests for LoopDetector — real execution trajectories from logs.
 
 These tests simulate the ACTUAL execution patterns observed in app_*.log:

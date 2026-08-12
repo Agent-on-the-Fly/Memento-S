@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """infra/ — 独立的基础设施层，为 Agent 提供可插拔的 Context 和 Memory 实现。
 
 目录结构:

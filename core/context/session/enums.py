@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """core.context.session.enums — session-level runtime state enumerations."""
 
 from enum import StrEnum

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Plan execution main loop — outer step loop + inner bounded react loop."""
 
 from __future__ import annotations

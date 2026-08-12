@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """daemon.agent_profile — AgentProfile 异步进化 Daemon。
 
 启动：

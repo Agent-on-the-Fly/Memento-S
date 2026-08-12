@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """验证 file_create state_delta 修复的测试脚本。"""
 import asyncio
 import sys

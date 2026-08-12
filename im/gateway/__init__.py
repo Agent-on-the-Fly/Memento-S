@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Gateway 模式桥接模块
 
 提供 Gateway 模式的 Agent Worker 实现。

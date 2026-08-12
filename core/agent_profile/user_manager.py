@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """UserManager — USER.md 文件 I/O + TTL 缓存。
 
 对称于 SoulManager，管理 USER.md 的读写和追加。

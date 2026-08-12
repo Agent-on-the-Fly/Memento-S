@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """IM Bridge 基类 - 封装 MementoSAgent 调用逻辑
 
 参照 GUI MessageController 实现，提供统一的 Agent 调用接口。

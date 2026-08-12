@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 IM 渠道状态检查命令（通过 EndpointService）
 

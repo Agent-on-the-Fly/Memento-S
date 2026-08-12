@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill 系统初始化器 - 内置技能同步。"""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """History — history loading, two-tier window, slim, and summary.
 
 Extracted from ContextManager for separation of concerns.

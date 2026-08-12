@@ -36,7 +36,7 @@ During the launch period, new app users can receive a generous token package for
 </table>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.3.8-blue?style=for-the-badge" alt="Version 0.3.8">
+  <img src="https://img.shields.io/badge/Version-0.4.0-blue?style=for-the-badge" alt="Version 0.4.0">
   <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/Skills-4%20built--in-0f766e" alt="4 built-in skills">
   <img src="https://img.shields.io/badge/Framework-Skill--Centric%20Runtime-b91c1c" alt="Skill-centric runtime">
@@ -60,7 +60,7 @@ During the launch period, new app users can receive a generous token package for
 
 <p align="center">
   <a href="#desktop-app-launch">App Launch</a> ·
-  <a href="#-whats-new-in-v038">What's New</a> ·
+  <a href="#-whats-new-in-v040">What's New</a> ·
   <a href="#-learning-results">Learning Results</a> ·
   <a href="#-one-click-gui-install">Install</a> ·
   <a href="#-quick-start-developer">Quick Start</a> ·
@@ -92,6 +92,21 @@ During the launch period, new app users can receive a generous token package for
 <p align="center"><sub>Read–Execute–Reflect–Write architecture studied in the accompanying technical work. The public runtime supplies skill retrieval and execution, step reflection and replanning, explicit skill creation, and persistent local storage.</sub></p>
 </td></tr>
 </table>
+
+---
+
+## What's New in v0.4.0
+
+> **v0.4.0** prepares the public runtime for reproducible software review with
+> consistent release metadata, explicit source licensing, installed-package
+> checks, and clearer contributor and security guidance.
+
+| Update | Description |
+| --- | --- |
+| **Release identity** | Python, Flet, Briefcase, runtime, citation, and configuration metadata identify the v0.4.0 source line consistently. |
+| **Source licensing** | Project-owned source files carry Apache-2.0 SPDX identifiers; separately licensed third-party material remains identified in `THIRD_PARTY_NOTICES.md`. |
+| **Installed-package CI** | Linux, macOS, and Windows install the built wheel, validate package metadata and dependencies, import public runtime modules, and exercise the CLI help entry point without credentials. |
+| **Public project guidance** | Stale implementation references are corrected, and citation and security-reporting files are included in the source distribution. |
 
 ---
 

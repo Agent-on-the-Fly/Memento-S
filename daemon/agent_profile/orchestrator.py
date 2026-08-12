@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AgentProfileEvolver — USER.md + SOUL.md 异步进化编排器。
 
 定时循环 + 会话结束触发，对标 Hermes Honcho 的 peer-card 机制。

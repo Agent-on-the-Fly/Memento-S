@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Prompt templates — string constants only, no logic.
 
 Sections:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill tool constants and schemas shared across all handlers."""
 
 from __future__ import annotations

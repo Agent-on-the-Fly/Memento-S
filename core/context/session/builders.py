@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """core.context.session.builders — prompt-building helpers for session-level data."""
 
 from __future__ import annotations

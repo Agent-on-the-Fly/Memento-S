@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 打包前下载 uv 二进制 + Python standalone 到 resources/
 

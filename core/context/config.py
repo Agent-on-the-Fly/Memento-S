@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Context 模块配置。
 
 ContextConfig 是 ContextManager 的唯一配置依赖。

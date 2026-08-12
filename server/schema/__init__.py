@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/schema/__init__.py
 Pydantic 模型定义

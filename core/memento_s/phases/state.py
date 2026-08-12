@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Mutable state for a single agent run (one ``reply_stream`` invocation)."""
 
 from __future__ import annotations

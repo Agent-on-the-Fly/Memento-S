@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """downloader — 技能下载
 
 此包提供技能下载功能。

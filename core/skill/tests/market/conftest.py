@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """market 测试配置"""
 
 import pytest

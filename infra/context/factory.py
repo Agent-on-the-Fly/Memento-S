@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ContextFactory — ContextProvider 工厂函数。
 
 无 core/ 依赖。

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Memento-S 存储模型 - 简化版（Session + Conversation 两层架构）
 

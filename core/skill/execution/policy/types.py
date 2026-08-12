@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Policy decision types for skill execution lifecycle."""
 
 from __future__ import annotations

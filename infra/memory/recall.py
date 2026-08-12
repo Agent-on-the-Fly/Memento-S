@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Topic recall — pure keyword matching, no embedding.
 
 Matches query tokens against topic slug, title, hook, and content.

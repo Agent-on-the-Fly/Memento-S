@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """compress_message 单条消息 LLM 摘要测试。"""
 from __future__ import annotations
 

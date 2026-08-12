@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Prompt-only test: render SkillAgent prompt with runtime paths.
 
 Run:

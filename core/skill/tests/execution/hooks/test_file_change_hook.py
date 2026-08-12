@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for FileChangeHook — core/skill/execution/hooks/file_change_hook.py
 
 Based on real execution logs (app_*.log):

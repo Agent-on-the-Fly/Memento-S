@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SessionMemory — L1 Session Memory 实现。
 
 迁移自 core/context/session_memory.py。

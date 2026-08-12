@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Session Sidebar - Displays Session list on the left
 

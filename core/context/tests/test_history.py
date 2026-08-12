@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """单元测试 — core/context/history.py: HistoryManager & helpers."""
 from __future__ import annotations
 

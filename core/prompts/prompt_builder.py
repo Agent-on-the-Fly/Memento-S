@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PromptBuilder — priority-ordered section assembly for system prompts.
 
 Sections are registered with a numeric priority (lower = earlier in output).

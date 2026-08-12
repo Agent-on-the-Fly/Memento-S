@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Skill call display widget for showing skill execution status
 """

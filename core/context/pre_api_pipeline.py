@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Pre-API Pipeline — 每次 LLM 调用前的上下文处理管道。
 
 对标 CC query.ts L365-L467 的 pre-API 流程。

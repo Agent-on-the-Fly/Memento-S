@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for infra/context/base.py — ContextProvider abstract interface.
 
 These tests verify the ContextProvider interface by checking that concrete

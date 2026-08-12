@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 钉钉渠道适配器。
 

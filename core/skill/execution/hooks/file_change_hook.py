@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """FileChangeHook — 集成 ExecutionFileTracker 的文件变化检测 Hook。
 
 在 BEFORE_TOOL_EXEC 时拍快照，在 AFTER_TOOL_EXEC 时对比、分类、决策。

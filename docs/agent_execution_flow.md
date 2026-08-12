@@ -1,8 +1,9 @@
 # Memento-S Agent 完整执行流程分析
 
-> Historical architecture trace. Its PDF examples refer to an external skill that
-> is not bundled with the Apache-2.0 distribution. Install only skills whose
-> licenses and provenance you have reviewed.
+> Historical architecture trace. The captured run predates the current Flet GUI
+> and four-skill Apache-2.0 distribution. Its PDF examples refer to an external
+> skill that is not bundled today. Install only skills whose licenses and
+> provenance you have reviewed.
 
 ## 概述
 
@@ -24,7 +25,8 @@ bootstrap:bootstrap:473 - [bootstrap] phase 7: syncing skills...
 - `bootstrap:bootstrap()` - 主启动函数
 - `SkillStore.__init__()` - 初始化技能存储
   - `load_all_skills()` - 从磁盘加载技能
-  - 加载 9 个技能: docx, filesystem, image_analysis, pdf, pptx, skill_creator, uv_pip_install, web_search, xlsx
+  - 历史运行加载了 9 个本地技能: docx, filesystem, image_analysis, pdf, pptx, skill_creator, uv_pip_install, web_search, xlsx
+  - 当前发行版仅内置 4 个技能: filesystem, skill-creator, uv-pip-install, web-search
 
 **代码位置**: `bootstrap.py:281-308`
 
@@ -37,7 +39,7 @@ _sync_skills()
   └── cleanup_orphaned_skills()  # 清理孤儿技能
 ```
 
-### Phase 2: Electron 初始化
+### Phase 2: 历史 Electron 初始化（当前 GUI 已改为 Flet）
 
 **时间点**: 20:32:04
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Post-execute recovery policy decisions."""
 
 from __future__ import annotations

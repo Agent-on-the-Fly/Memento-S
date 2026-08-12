@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """shared/schema/skill_search.py — 检索结果命中（跨 retrieval 层和 UI）。
 
 替代旧的 RecallCandidate（core/skill/retrieval/schema.py）。

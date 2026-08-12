@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AG-UI wire-format event types and builders.
 
 Depends only on .types (leaf enums).

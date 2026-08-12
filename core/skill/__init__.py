@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """skill — 技能领域模型与契约导出
 
 提供 Skill 相关的领域模型和公共 API。

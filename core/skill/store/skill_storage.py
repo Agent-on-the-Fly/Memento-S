@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill 存储实现：本地文件存储 + 注册表管理。
 
 组合 FileStorage 和 SkillRegistry 的功能，提供完整的 skill 持久化能力：

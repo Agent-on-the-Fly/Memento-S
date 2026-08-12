@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Conftest for core/skill/tests/execution — execution layer test fixtures."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """工具函数 — 压缩模块的共享工具。"""
 
 from __future__ import annotations

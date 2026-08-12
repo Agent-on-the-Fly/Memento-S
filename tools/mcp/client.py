@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MCP tool loader — integrates MCP servers into the ToolRegistry.
 
 Loads tools from configured MCP servers using the official `mcp` package,

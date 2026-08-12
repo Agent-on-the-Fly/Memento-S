@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """JavaScript/TypeScript REPL tool powered by NodeSandbox."""
 
 from __future__ import annotations

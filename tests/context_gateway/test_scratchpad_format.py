@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Scratchpad._format_for_scratchpad 格式化测试。"""
 from __future__ import annotations
 

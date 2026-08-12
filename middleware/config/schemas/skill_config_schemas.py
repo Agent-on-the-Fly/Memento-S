@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Skill Registry Configuration Pydantic Models.
 

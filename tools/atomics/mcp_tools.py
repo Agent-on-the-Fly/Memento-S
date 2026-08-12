@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MCP resource tools — list and read MCP server resources."""
 
 from __future__ import annotations

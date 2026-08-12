@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """智能内容提取 — 分层提取策略。
 
 Layer 0: 结构化提取 (零 LLM)

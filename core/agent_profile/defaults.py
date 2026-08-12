@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Default templates for SOUL.md and USER.md — single source of truth."""
 
 # ── SOUL.md ────────────────────────────────────────────────────────────────────

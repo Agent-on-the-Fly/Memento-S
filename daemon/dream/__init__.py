@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """daemon.dream — Dream 后台整合 Daemon。
 
 启动（bootstrap.py 中调用）：

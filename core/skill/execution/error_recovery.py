@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Error pattern detection and automatic recovery system.
 
 This module provides intelligent error analysis and recovery hint injection

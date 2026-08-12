@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """core.protocol — public interface for the AG-UI event protocol.
 
 All consumers (GUI, CLI, Feishu) and producers (agent, phases) import

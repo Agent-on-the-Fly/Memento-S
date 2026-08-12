@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """RunEmitter — protocol-agnostic event emitter for a single agent run.
 
 Agent and phase code calls typed methods here; the adapter translates

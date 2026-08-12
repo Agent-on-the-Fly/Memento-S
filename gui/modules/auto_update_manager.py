@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Auto Update Manager for Memento-S GUI.
 
@@ -447,7 +448,7 @@ class AutoUpdateManager:
                 return current_version
             except Exception as e:
                 logger.error(f"[AutoUpdate] Failed to get version: {e}")
-                return "0.2.0"
+                return "0+unknown"
 
     def _mark_checked(self) -> None:
         """Record that a check cycle has completed (regardless of path taken)."""

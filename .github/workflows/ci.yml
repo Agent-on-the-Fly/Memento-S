@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 name: CI
 
 "on":
@@ -23,6 +24,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
       PYTHONDONTWRITEBYTECODE: "1"
+      LITELLM_LOCAL_MODEL_COST_MAP: "true"
 
     steps:
       - uses: actions/checkout@v6
@@ -65,7 +67,7 @@ jobs:
           --cov-report=xml:coverage.xml
           --cov-report=html:htmlcov
       - name: Publish smoke coverage report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-coverage-${{ matrix.os }}
           path: |
@@ -94,8 +96,71 @@ jobs:
       - name: Inspect distribution contents
         run: python scripts/check_release_readiness.py --dist dist
       - name: Publish inspected distributions
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: python-distributions
           path: dist/
           if-no-files-found: error
+
+  installed-package:
+    name: Installed package (${{ matrix.os }})
+    needs: distributions
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      LITELLM_LOCAL_MODEL_COST_MAP: "true"
+      MEMENTO_HOME: ${{ runner.temp }}/memento_s
+
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+      - name: Download inspected distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: python-distributions
+          path: ${{ runner.temp }}/dist
+      - name: Install the built wheel and runtime dependencies
+        working-directory: ${{ runner.temp }}
+        run: >-
+          python -c "from pathlib import Path; import subprocess, sys;
+          wheels=list(Path('dist').glob('*.whl'));
+          assert len(wheels) == 1, wheels;
+          subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0])])"
+      - name: Validate installed dependencies
+        working-directory: ${{ runner.temp }}
+        run: python -m pip check
+      - name: Verify installed metadata, imports, and built-in resources
+        working-directory: ${{ runner.temp }}
+        run: >-
+          python -c "from importlib.metadata import version;
+          from importlib.resources import files;
+          from shutil import which;
+          assert version('memento-s') == '0.4.0';
+          assert which('memento'), 'installed memento console script was not found';
+          import cli.main, core.memento_s, gui.app, middleware.config, shared.schema, tools.registry;
+          root=files('builtin').joinpath('skills');
+          expected={'filesystem', 'skill-creator', 'uv-pip-install', 'web-search'};
+          missing=sorted(name for name in expected if not root.joinpath(name, 'SKILL.md').is_file());
+          assert not missing, missing"
+      - name: Exercise installed CLI help without starting runtime services
+        working-directory: ${{ runner.temp }}
+        run: >-
+          python -c "from typer.testing import CliRunner;
+          from cli.main import app;
+          result=CliRunner().invoke(app, ['--help']);
+          assert result.exit_code == 0, result.output;
+          assert 'Memento-S Agent CLI' in result.output, result.output"
+      - name: Confirm CLI help did not initialize user state
+        working-directory: ${{ runner.temp }}
+        run: >-
+          python -c "import os; from pathlib import Path;
+          path=Path(os.environ['MEMENTO_HOME']);
+          assert not path.exists(), f'CLI help unexpectedly created {path}'"

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Phase: Intent recognition — classify user intent as the *Comprehender* role.
 
 Responsibilities:

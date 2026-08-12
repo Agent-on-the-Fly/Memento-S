@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared utilities for sandbox management."""
 
 from __future__ import annotations

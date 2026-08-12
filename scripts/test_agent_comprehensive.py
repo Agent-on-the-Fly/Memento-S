@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Comprehensive Agent Error Handling Tests
 
 Tests Agent's error handling across multiple scenarios:

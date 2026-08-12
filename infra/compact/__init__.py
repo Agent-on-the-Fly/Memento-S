@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Compact Module — 独立的上下文压缩引擎。
 
 支持多层级渐进式压缩:

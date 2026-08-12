@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Utility modules."""
 
 from utils.token_utils import count_tokens, count_tokens_messages

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Hook 类型定义 — 生命周期事件枚举和 Payload/Result 结构。"""
 
 from __future__ import annotations

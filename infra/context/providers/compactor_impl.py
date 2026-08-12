@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CompactorProvider implementation — TokenBudgetCompactor.
 
 迁移自 core/context/pipeline.py 的 PreApiPipeline。

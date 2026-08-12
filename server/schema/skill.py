@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/schema/skill.py
 技能相关 Pydantic 模型

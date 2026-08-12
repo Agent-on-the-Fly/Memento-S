@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skill_model.py - Skill 模型测试
 
 测试 Skill 领域模型的创建、验证和属性。

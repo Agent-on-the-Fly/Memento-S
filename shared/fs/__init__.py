@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """shared/fs - 统一的文件系统监控抽象层。
 
 整合三套快照系统：

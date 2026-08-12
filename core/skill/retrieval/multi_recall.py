@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """multi_recall — 多路召回合并器
 
 管理多个召回策略，执行并行召回并合并去重。

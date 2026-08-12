@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for HookExecutor — shared/hooks/executor.py"""
 
 from __future__ import annotations

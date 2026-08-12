@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """飞书 Agent 桥接
 
 封装飞书平台的 Agent 调用逻辑，处理飞书消息并与 Agent 交互。

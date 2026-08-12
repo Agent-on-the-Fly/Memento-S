@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """shared/fs/snapshot - 统一的快照管理器。
 
 整合以下三套快照实现：

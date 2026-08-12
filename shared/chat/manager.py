@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared Chat Manager — 内部基类.
 
 提供延迟初始化的服务管理器基类。

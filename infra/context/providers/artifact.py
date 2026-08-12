@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ArtifactProvider — Tool Result 持久化抽象。
 
 抽象 Tool Result 的动态落盘 + 智能提取能力。

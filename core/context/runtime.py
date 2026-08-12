@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """core.context.runtime — RuntimeState + RuntimeStateStore (per-session persistence).
 
 This module defines the session-level runtime state that survives across reply_stream

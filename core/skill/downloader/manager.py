@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """下载管理器 —— 管理多个下载器，自动选择合适的下载器。"""
 
 from __future__ import annotations

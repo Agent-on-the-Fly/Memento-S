@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """DreamConsolidator — Dream 触发器，只做 Gate 检查，核心整合委托给 engine."""
 
 from __future__ import annotations

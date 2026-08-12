@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """企业微信桥接模块
 
 提供企业微信平台的 Agent 桥接实现。

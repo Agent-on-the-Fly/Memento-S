@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """HookExecutor — 通用生命周期 hook 执行器。"""
 
 from __future__ import annotations

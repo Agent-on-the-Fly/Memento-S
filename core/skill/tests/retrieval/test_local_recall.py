@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_local_recall.py — LocalRecall 单元测试
 
 测试本地文件扫描召回功能。

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Apply consolidation results to topic files and index."""
 
 from __future__ import annotations

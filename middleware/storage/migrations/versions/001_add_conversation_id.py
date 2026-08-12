@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """add conversation_id to conversations
 
 Revision ID: 001_add_conversation_id

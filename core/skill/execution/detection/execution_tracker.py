@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Execution-level file tracker for tool execution.
 
 Aggregates file changes, classifies lifecycle, applies policies,

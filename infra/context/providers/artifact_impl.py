@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ArtifactProviderImpl — 文件系统存储的 Tool Result 持久化。
 
 迁移自 core/context/artifacts.py 的 ArtifactStore。

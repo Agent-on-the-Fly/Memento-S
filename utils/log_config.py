@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """日志配置工具 - 统一管理日志截断长度"""
 
 from __future__ import annotations

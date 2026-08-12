@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Compact 可观测性 — 具体实现 + 指标聚合器。
 
 继承 infra.compact.abc.CompactObserver，提供：

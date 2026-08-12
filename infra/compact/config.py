@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """配置模型 — 压缩模块的所有可配置参数。"""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """单元测试 — core/prompts/prompt_builder.py: PromptBuilder 优先级/拼接逻辑。"""
 
 from __future__ import annotations

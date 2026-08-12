@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SOUL.md evolution prompt templates — identity introspection and self-improvement.
 
 Pass 0: 身份观察 — cold start, comprehensive observation

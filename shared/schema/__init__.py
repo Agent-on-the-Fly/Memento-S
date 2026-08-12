@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """shared/schema — 跨层共享 Schema 中心。
 
 所有被 core/skill/ 之外的模块共引的 Skill 相关类型在此定义和重导出。

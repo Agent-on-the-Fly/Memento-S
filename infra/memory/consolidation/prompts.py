@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Prompts for memory consolidation — quick and deep modes."""
 
 from __future__ import annotations

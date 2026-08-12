@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Constants for AgentProfile system."""
 
 SOUL_FILE = "SOUL.md"

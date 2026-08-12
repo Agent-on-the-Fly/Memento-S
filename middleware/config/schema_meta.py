@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Schema 元数据解析模块
 

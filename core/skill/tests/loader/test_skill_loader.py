@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skill_loader.py - SkillLoader 加载器测试
 
 测试 SkillLoader 从磁盘加载 skill 的功能。

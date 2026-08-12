@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Execution helpers — append logic, context token, and pre-API pipeline utilities."""
 
 from __future__ import annotations

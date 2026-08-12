@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AgentProfile — agent identity system: SOUL.md + USER.md.
 
 Architecture (v2):

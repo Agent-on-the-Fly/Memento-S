@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ResultCache — 纯内存的结构化结果缓存。
 
 设计原则：

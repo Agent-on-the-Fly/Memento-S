@@ -7,7 +7,7 @@
 ## 1. 安装
 
 ```bash
-git clone https://github.com/Agent-on-the-Fly/Memento-S.git && cd Memento-S && python -m venv .venv && source .venv/bin/activate && pip install -e .
+git clone https://github.com/Memento-Teams/Memento-Skills.git && cd Memento-Skills && python -m venv .venv && source .venv/bin/activate && pip install -e .
 ```
 
 安装完成后 `memento` 和 `memento-gui` 命令即可使用。

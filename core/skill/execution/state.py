@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ReAct State — Skill 执行层状态管理。
 
 语义分层：

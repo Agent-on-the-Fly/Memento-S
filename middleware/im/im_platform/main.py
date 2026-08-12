@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """IM 平台操作入口脚本（Playbook entry_script）。
 
 Agent 通过 execute_skill 调用时指定 args 参数：

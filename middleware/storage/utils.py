@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Utility functions for storage module."""
 
 import struct

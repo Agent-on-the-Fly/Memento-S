@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """retrieval 测试共享 fixtures
 
 提供 RecallTestConfig 和所有 recall 策略的 fixtures。

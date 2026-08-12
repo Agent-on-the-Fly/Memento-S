@@ -5,6 +5,7 @@ Revises: ${down_revision | comma,n}
 Create Date: ${create_date}
 
 """
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 from alembic import op

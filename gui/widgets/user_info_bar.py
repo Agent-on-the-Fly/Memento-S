@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 UserInfoBar - User login entry / logged-in info display at the bottom of sidebar.
 

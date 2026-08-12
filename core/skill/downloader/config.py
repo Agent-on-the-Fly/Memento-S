@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """下载配置。"""
 
 from __future__ import annotations

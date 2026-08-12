@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/endpoint/im/cli.py
 IM 渠道 CLI 命令（迁移自 cli/commands/ 和 im/*/cli.py）。

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Information saturation detector for search results.
 
 Analyzes content quality to detect when information gathering has reached diminishing returns.

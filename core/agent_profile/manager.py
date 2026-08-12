@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AgentProfileManager — Facade（统一入口）。
 
 agent.py 只对接这一个 Manager，底层委托给 SoulManager 和 UserManager。

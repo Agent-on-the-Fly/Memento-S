@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Sandbox — UV-based local execution helpers.
 
 This module provides a unified interface for executing code and shell commands

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Template-driven config merge without versioning.
 
 This merge strategy only adds missing keys from the template. It never

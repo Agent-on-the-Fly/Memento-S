@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """skill.json 注册表 — skill 系统的本地注册表封装。
 
 封装 SkillConfigManager，对外暴露 skill 系统需要的接口。

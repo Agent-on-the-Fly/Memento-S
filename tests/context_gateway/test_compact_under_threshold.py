@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Compact 空消息路径: 原样返回。"""
 from __future__ import annotations
 

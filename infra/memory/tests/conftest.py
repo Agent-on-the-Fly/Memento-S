@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """conftest.py — Fixtures for infra/memory tests.
 
 使用真实路径 ~/memento_s/context 进行测试，验证实际文件写入。

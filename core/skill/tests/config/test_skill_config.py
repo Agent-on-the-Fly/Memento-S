@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skill_config.py - SkillConfig 配置测试
 
 测试 SkillConfig 的创建和属性。

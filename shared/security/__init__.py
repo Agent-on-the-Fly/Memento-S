@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared security module — policy engine and security checks.
 
 职责定位：

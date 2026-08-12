@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for Hook types and events — shared/hooks/types.py"""
 
 from __future__ import annotations

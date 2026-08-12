@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """retrieval/base.py — 召回基类定义
 
 定义召回策略的抽象基类，统一召回接口。

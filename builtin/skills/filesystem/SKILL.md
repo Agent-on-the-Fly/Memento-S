@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: Apache-2.0
 name: filesystem
 description: Direct filesystem operations (read, write, edit, list, search files). Use for any file manipulation tasks.
 ---

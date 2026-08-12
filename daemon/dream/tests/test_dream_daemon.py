@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for daemon/dream/__init__.py — DreamDaemon."""
 
 from __future__ import annotations

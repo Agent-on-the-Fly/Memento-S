@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: Apache-2.0
 name: web-search
 description: Web search and content fetching. Use when the user needs to search the web for information or fetch content from URLs.
 metadata:

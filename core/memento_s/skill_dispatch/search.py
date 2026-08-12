@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill search handler — searches local and cloud skills with guided output."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SandboxAuditHook — Sandbox 快照对比审计（BEFORE_TOOL_EXEC + AFTER_TOOL_EXEC）。
 
 可选集成 FsSnapshotManager 以复用 FileChangeHook 的快照，

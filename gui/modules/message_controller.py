@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Message controller - handles sending messages and AG-UI event orchestration."""
 
 from __future__ import annotations

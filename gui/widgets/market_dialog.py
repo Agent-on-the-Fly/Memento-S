@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Markket Dialog - Skill market with install/uninstall functionality."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AgentProfile dataclass — pure data container for agent identity (SOUL.md pattern)."""
 
 from dataclasses import dataclass, field

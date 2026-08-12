@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """共享内容提取工具 — smart_extract。
 
 从 infra/context/providers/artifact_impl.py 和

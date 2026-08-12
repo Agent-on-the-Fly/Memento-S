@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """统一运行时模式检测
 
 路径策略：
