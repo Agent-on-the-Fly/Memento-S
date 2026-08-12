@@ -114,7 +114,6 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
       LITELLM_LOCAL_MODEL_COST_MAP: "true"
-      MEMENTO_HOME: ${{ runner.temp }}/memento_s
 
     steps:
       - uses: actions/setup-python@v6
@@ -139,6 +138,8 @@ jobs:
         run: python -m pip check
       - name: Verify installed metadata, imports, and built-in resources
         working-directory: ${{ runner.temp }}
+        env:
+          MEMENTO_HOME: ${{ runner.temp }}/memento_s
         run: >-
           python -c "from importlib.metadata import version;
           from importlib.resources import files;
@@ -152,6 +153,8 @@ jobs:
           assert not missing, missing"
       - name: Exercise installed CLI help without starting runtime services
         working-directory: ${{ runner.temp }}
+        env:
+          MEMENTO_HOME: ${{ runner.temp }}/memento_s
         run: >-
           python -c "from typer.testing import CliRunner;
           from cli.main import app;
@@ -160,6 +163,8 @@ jobs:
           assert 'Memento-S Agent CLI' in result.output, result.output"
       - name: Confirm CLI help did not initialize user state
         working-directory: ${{ runner.temp }}
+        env:
+          MEMENTO_HOME: ${{ runner.temp }}/memento_s
         run: >-
           python -c "import os; from pathlib import Path;
           path=Path(os.environ['MEMENTO_HOME']);
