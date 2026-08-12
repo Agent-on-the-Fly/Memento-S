@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Modified by Memento-Skills contributors, 2026 (license notice only). -->
+
 # Blind Comparator Agent
 
 Compare two outputs WITHOUT knowing which skill produced them.

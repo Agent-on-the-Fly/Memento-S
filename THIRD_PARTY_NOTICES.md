@@ -18,6 +18,12 @@ govern that component.
 
 The local copy modifies `SKILL.md`, `scripts/improve_description.py`,
 `scripts/quick_validate.py`, and `scripts/run_loop.py` relative to that revision.
+For JMLR MLOSS source-package clarity, the local distribution also adds an
+`SPDX-License-Identifier: Apache-2.0` notice to every source and documentation
+file in this component. Each file identifies the local modification. The other
+13 source and documentation files differ from the imported revision only by
+these license and modification notices; those notice-only changes do not alter
+runtime behavior.
 
 ### SheetJS Community Edition
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Memento-Skills contributors, 2026; see THIRD_PARTY_NOTICES.md.
 """
 Quick validation script for skills - validates one or all skills
 """
