@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Memento-Skills contributors, 2026 (license notice only).
 """
 Skill Packager - Creates a distributable .skill file of a skill folder
 

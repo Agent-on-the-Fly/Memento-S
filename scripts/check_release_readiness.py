@@ -23,6 +23,7 @@ REQUIRED_ROOT_FILES = {
 }
 EXPECTED_VERSION = "0.4.0"
 SPDX_MARKER = "SPDX-License-Identifier: Apache-2.0"
+THIRD_PARTY_MODIFICATION_MARKER = "Modified by Memento-Skills contributors, 2026"
 PROJECT_PYTHON_ROOTS = (
     "build_scripts",
     "builtin",
@@ -50,6 +51,7 @@ SPDX_TEXT_FILES = (
     "requirements-dev.txt",
     "requirements-prod.txt",
 )
+THIRD_PARTY_SOURCE_SUFFIXES = {".html", ".md", ".py"}
 REQUIRED_BUILTINS = {
     "filesystem",
     "skill-creator",
@@ -130,6 +132,30 @@ def check_source_tree(root: Path) -> None:
             spdx_missing.append(relative)
     if spdx_missing:
         _fail(f"project files missing Apache-2.0 SPDX markers: {', '.join(sorted(spdx_missing))}")
+
+    skill_creator_root = root / "builtin" / "skills" / "skill-creator"
+    third_party_spdx_missing = []
+    third_party_modification_notice_missing = []
+    for path in skill_creator_root.rglob("*"):
+        if not path.is_file() or path.suffix not in THIRD_PARTY_SOURCE_SUFFIXES:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if SPDX_MARKER not in text:
+            third_party_spdx_missing.append(path.relative_to(root).as_posix())
+        if THIRD_PARTY_MODIFICATION_MARKER not in text:
+            third_party_modification_notice_missing.append(
+                path.relative_to(root).as_posix()
+            )
+    if third_party_spdx_missing:
+        _fail(
+            "third-party source files missing Apache-2.0 SPDX markers: "
+            + ", ".join(sorted(third_party_spdx_missing))
+        )
+    if third_party_modification_notice_missing:
+        _fail(
+            "third-party source files missing modification notices: "
+            + ", ".join(sorted(third_party_modification_notice_missing))
+        )
 
 
 def _archive_members(path: Path) -> set[str]:
