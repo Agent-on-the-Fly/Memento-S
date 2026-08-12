@@ -1,6 +1,7 @@
 """统一运行时模式检测
 
 路径策略：
+- MEMENTO_HOME: 显式覆盖所有用户数据路径（适用于测试和隔离部署）
 - DEV: ~/memento_s
 - PRODUCTION: platformdirs.user_data_dir("memento_s", "memento_s")
 
@@ -21,6 +22,12 @@ from pathlib import Path
 import platformdirs
 
 
+def _home_override() -> Path | None:
+    """Return the optional application data-root override."""
+    value = os.getenv("MEMENTO_HOME", "").strip()
+    return Path(value).expanduser() if value else None
+
+
 class RuntimeMode(Enum):
     """运行时模式枚举"""
 
@@ -32,6 +39,8 @@ class RuntimeMode(Enum):
     @property
     def data_dir(self) -> Path:
         """用户数据根目录"""
+        if override := _home_override():
+            return override
         if self == self.DEV:
             return Path.home() / "memento_s"
         return Path(platformdirs.user_data_dir("memento_s", "memento_s"))
@@ -39,6 +48,8 @@ class RuntimeMode(Enum):
     @property
     def config_dir(self) -> Path:
         """配置文件目录"""
+        if override := _home_override():
+            return override
         if self == self.DEV:
             return Path.home() / "memento_s"
         return Path(platformdirs.user_config_dir("memento_s", "memento_s"))
@@ -46,6 +57,8 @@ class RuntimeMode(Enum):
     @property
     def logs_dir(self) -> Path:
         """日志目录"""
+        if _home_override():
+            return self.data_dir / "logs"
         if self == self.DEV:
             return self.data_dir / "logs"
         return Path(platformdirs.user_log_dir("memento_s", "memento_s"))
@@ -156,6 +169,7 @@ def _main() -> None:
     print(f"  detected_mode: {get_runtime_mode().value}")
     print(f"  sys.frozen:    {getattr(sys, 'frozen', False)}")
     print(f"  MEMENTO_ENV:   {os.getenv('MEMENTO_ENV', '(not set)')}")
+    print(f"  MEMENTO_HOME:  {os.getenv('MEMENTO_HOME', '(not set)')}")
     print()
     _print_mode_paths("DEV", RuntimeMode.DEV)
     print()

@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-from pathlib import Path
 from typing import Any
 
 from middleware.config import g_config
@@ -45,31 +44,6 @@ CASE_LIBRARY: list[dict[str, Any]] = [
         "name": "web_search",
         "skill": "web-search",
         "request": "最新的 Python 3.13 版本有哪些新特性？",
-    },
-    {
-        "name": "pdf_summary",
-        "skill": "pdf",
-        "request": "Summarize the first two pages of the pdf at /path/to/sample.pdf.",
-    },
-    {
-        "name": "xlsx_overview",
-        "skill": "xlsx",
-        "request": "Open the spreadsheet at /path/to/sample.xlsx and list sheet names.",
-    },
-    {
-        "name": "docx_extract",
-        "skill": "docx",
-        "request": "Extract headings from /path/to/sample.docx.",
-    },
-    {
-        "name": "pptx_outline",
-        "skill": "pptx",
-        "request": "Generate a slide outline for /path/to/sample.pptx.",
-    },
-    {
-        "name": "image_analysis",
-        "skill": "image-analysis",
-        "request": "Describe the main objects in /path/to/sample.png.",
     },
     {
         "name": "invalid_skill",
@@ -105,79 +79,11 @@ async def _execute_skill(provider: SkillGateway, skill_name: str, request: str) 
     _print_payload(payload)
 
 
-async def _prepare_dependency_case(provider: SkillGateway) -> dict[str, str] | None:
-    workspace = Path(g_config.paths.workspace_dir)
-    test_dir = workspace / "skill_executor" / "deps"
-    test_dir.mkdir(parents=True, exist_ok=True)
-
-    sample_path = test_dir / "sample.xlsx"
-    if not sample_path.exists():
-        import zipfile
-
-        content_types = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">
-  <Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>
-  <Default Extension=\"xml\" ContentType=\"application/xml\"/>
-  <Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>
-  <Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>
-</Types>
-"""
-        rels = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">
-  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>
-</Relationships>
-"""
-        workbook = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">
-  <sheets>
-    <sheet name=\"Sheet1\" sheetId=\"1\" r:id=\"rId1\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"/>
-  </sheets>
-</workbook>
-"""
-        workbook_rels = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">
-  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>
-</Relationships>
-"""
-        sheet1 = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">
-  <sheetData>
-    <row r=\"1\">
-      <c r=\"A1\" t=\"str\"><v>hello</v></c>
-    </row>
-  </sheetData>
-</worksheet>
-"""
-        with zipfile.ZipFile(sample_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("[Content_Types].xml", content_types)
-            zf.writestr("_rels/.rels", rels)
-            zf.writestr("xl/workbook.xml", workbook)
-            zf.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
-            zf.writestr("xl/worksheets/sheet1.xml", sheet1)
-
-    return {
-        "name": "xlsx_dependency_auto_install",
-        "skill": "xlsx",
-        "request": f"Open {sample_path} and list sheet names.",
-    }
-
-
 async def _run_cases(provider: SkillGateway) -> None:
-    dependency_case = await _prepare_dependency_case(provider)
-
     for case in CASE_LIBRARY:
         name = case.get("name", "unnamed")
         print(f"\n=== CASE: {name} ===")
         await _execute_skill(provider, case["skill"], case["request"])
-
-    if dependency_case:
-        print(f"\n=== CASE: {dependency_case['name']} ===")
-        await _execute_skill(
-            provider,
-            dependency_case["skill"],
-            dependency_case["request"],
-        )
-
 
 async def main() -> None:
     g_config.load()

@@ -41,26 +41,11 @@ Configuration:
 from __future__ import annotations
 
 import asyncio
-import sys
 import time
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 # Instance counter for debugging
 _instance_counter = 0
-
-# Add 3rd party SDK to path before importing
-# Support both frozen (PyInstaller) and source modes
-_IS_FROZEN = getattr(sys, 'frozen', False)
-_MEIPASS_DIR = getattr(sys, '_MEIPASS', None)
-
-if _IS_FROZEN and _MEIPASS_DIR:
-    _3RD_DIR = Path(_MEIPASS_DIR) / "3rd"
-else:
-    _3RD_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "3rd"
-
-if str(_3RD_DIR) not in sys.path:
-    sys.path.insert(0, str(_3RD_DIR))
 
 from .base import BaseChannelAdapter
 from ..protocol import (
@@ -76,8 +61,8 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Try to import openclaw-weixin-python SDK
-# First try local 3rd party version, then system installed
+# The optional SDK is intentionally not vendored. Install a separately licensed
+# copy into the active environment to enable this channel.
 try:
     from weixin_sdk import (
         WeixinClient,
@@ -88,13 +73,12 @@ try:
     )
 
     WEIXIN_SDK_AVAILABLE = True
-    logger.info("[WechatIlinkaiAdapter] Using weixin_sdk from local 3rd/ directory")
+    logger.info("[WechatIlinkaiAdapter] Using externally installed weixin_sdk")
 except ImportError as e:
     WEIXIN_SDK_AVAILABLE = False
     logger.warning(
         f"[WechatIlinkaiAdapter] weixin_sdk not available: {e}. "
-        "Make sure 3rd/weixin_sdk exists or install with: "
-        "uv pip install -e /path/to/openclaw-weixin-python"
+        "Install a separately licensed SDK in the active environment to enable WeChat."
     )
 
 

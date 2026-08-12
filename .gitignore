@@ -30,6 +30,9 @@ __pycache__/
 # Python packaging / builds
 build/
 dist/
+.coverage
+coverage.xml
+htmlcov/
 *.egg-info/
 *.egg
 pip-wheel-metadata/

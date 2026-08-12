@@ -6,7 +6,6 @@ import logging
 import os
 import platform
 import shutil
-import sys
 from pathlib import Path
 from typing import Any, Callable, TYPE_CHECKING
 
@@ -3386,14 +3385,6 @@ class SettingsPanel:
         self, base_url: str, token: str
     ) -> tuple[bool, str]:
         """异步验证微信token。"""
-        import sys
-        from pathlib import Path
-
-        # 添加3rd目录到路径
-        _3RD_DIR = Path(__file__).resolve().parent.parent.parent / "3rd"
-        if str(_3RD_DIR) not in sys.path:
-            sys.path.insert(0, str(_3RD_DIR))
-
         from weixin_sdk.client import WeixinClient
         from weixin_sdk.exceptions import WeixinSessionExpiredError, WeixinAuthError
 

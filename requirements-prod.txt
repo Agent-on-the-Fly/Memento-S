@@ -78,9 +78,5 @@ dingtalk-stream==0.24.3
 # Build Tools
 pyinstaller>=6.0.0
 
-# WeChat SDK Dependencies (3rd/weixin_sdk)
-pycryptodome>=3.15.0  # AES encryption for media uploads
-qrcode[pil]>=7.4.0    # QR code generation for login
-tabulate>=0.9.0       # CLI table formatting
-pysilk>=0.0.1         # SILK voice transcoding (optional)
-python-socks>=2.8.1   # Proxy support
+# Optional WeChat support requires a separately licensed SDK installed by the user.
+qrcode[pil]>=7.4.0    # QR code rendering for optional login flows

@@ -2,8 +2,6 @@ import asyncio
 import base64
 import io
 import logging
-import sys
-from pathlib import Path
 from typing import Callable, Optional
 
 import flet as ft
@@ -223,10 +221,6 @@ class WechatLoginDialog:
                     await asyncio.sleep(2)
 
     async def _try_login_once(self):
-        _3RD_DIR = Path(__file__).resolve().parent.parent.parent / "3rd"
-        if str(_3RD_DIR) not in sys.path:
-            sys.path.insert(0, str(_3RD_DIR))
-
         from weixin_sdk.auth.qr_login import QRLoginManager
         import qrcode
 

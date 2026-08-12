@@ -69,12 +69,14 @@ class MementoSPackBuilder:
         # --add-data: action="append", nargs="*" → [[val, ...], ...]
         add_data = [[
             f"{root / 'bootstrap.py'}{self.path_sep}.",
+            f"{root / 'LICENSE'}{self.path_sep}.",
+            f"{root / 'NOTICE'}{self.path_sep}.",
+            f"{root / 'THIRD_PARTY_NOTICES.md'}{self.path_sep}.",
             f"{root / 'core'}{self.path_sep}core",
             f"{root / 'middleware'}{self.path_sep}middleware",
             f"{root / 'gui'}{self.path_sep}gui",
             f"{root / 'utils'}{self.path_sep}utils",
             f"{root / 'builtin'}{self.path_sep}builtin",
-            f"{root / '3rd'}{self.path_sep}3rd",
             f"{root / 'assets'}{self.path_sep}assets",
             f"{root / 'resources' / 'bin'}{self.path_sep}resources/bin",
         ]]
@@ -85,8 +87,6 @@ class MementoSPackBuilder:
             "tiktoken.registry", "tiktoken.model", "tiktoken.core",
             "tiktoken_ext", "tiktoken_ext.openai_public",
             "anthropic", "litellm", "jieba", "version",  # 添加 version 模块
-            "weixin_sdk", "weixin_sdk.auth", "weixin_sdk.auth.qr_login",
-            "weixin_sdk.client", "weixin_sdk.exceptions",
             # SSL and HTTPS related imports
             "ssl", "urllib3", "requests", "httpx", "aiohttp",
             "_ssl", "socket", "select", "selectors",
@@ -106,7 +106,6 @@ class MementoSPackBuilder:
         pyinstaller_build_args = [[
             f"--workpath={root / 'dist' / 'memento_s_build'}",
             "--clean",
-            f"--paths={root / '3rd'}",
             "--collect-all=tiktoken",
             "--collect-data=tiktoken",
             "--collect-all=tiktoken_ext",
@@ -121,8 +120,6 @@ class MementoSPackBuilder:
             "--collect-all=aiohttp",
             "--collect-all=requests",
             "--collect-all=urllib3",
-            "--collect-submodules=weixin_sdk",
-            "--collect-data=weixin_sdk",
             "--collect-all=qrcode",
             "--collect-all=PIL",
             f"--add-data={endpoints_json}{self.path_sep}litellm/containers",
