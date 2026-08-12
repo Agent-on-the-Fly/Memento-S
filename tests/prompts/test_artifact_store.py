@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """集成测试 — infra/compact/storage.py: ArtifactStore 落盘 + preview 替换。"""
 
 from __future__ import annotations

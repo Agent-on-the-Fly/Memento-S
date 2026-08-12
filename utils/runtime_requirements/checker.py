@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Runtime requirements checking — verify presence and version of system-level tools."""
 
 from __future__ import annotations

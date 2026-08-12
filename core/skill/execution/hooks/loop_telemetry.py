@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """LoopTelemetryHook — Loop 检测遥测 Hook。
 
 监听 ON_LOOP_DETECTED 事件，记录遥测数据（日志、metrics）。

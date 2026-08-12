@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Config-based environment variable loading."""
 
 from __future__ import annotations

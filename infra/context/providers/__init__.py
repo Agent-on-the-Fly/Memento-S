@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """infra/context/providers — Context 内部子模块。
 
 Compactor: Pre-API 压缩流水线 (ABC + 实现)

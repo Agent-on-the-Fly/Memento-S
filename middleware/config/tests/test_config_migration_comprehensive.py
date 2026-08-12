@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 配置迁移综合测试
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Memento-S Agent — thin orchestration layer.
 
 All heavy logic lives in ``phases/``, ``core/context/``, and ``utils.py``.

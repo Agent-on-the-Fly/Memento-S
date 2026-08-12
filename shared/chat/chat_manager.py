@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Chat Manager — 统一的 Chat 管理入口.
 
 提供类方法级别的 Session 和 Conversation 操作，是 GUI、Agent、CLI、IM 的统一入口。

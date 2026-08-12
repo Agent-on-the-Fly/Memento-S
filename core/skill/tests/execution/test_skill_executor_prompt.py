@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skill_executor_prompt.py - SkillAgent Prompt 构建测试
 
 测试 SkillAgent 的 prompt 构建功能。

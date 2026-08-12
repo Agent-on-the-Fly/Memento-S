@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """技能下载器抽象基类。
 
 定义所有技能下载器必须实现的接口。

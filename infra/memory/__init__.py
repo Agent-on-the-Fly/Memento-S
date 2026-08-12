@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """infra/memory — Memory 实现层。"""
 
 from infra.memory.impl.session_memory import SessionMemory

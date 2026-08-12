@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Pre-execute gate checks for skill execution."""
 
 from __future__ import annotations

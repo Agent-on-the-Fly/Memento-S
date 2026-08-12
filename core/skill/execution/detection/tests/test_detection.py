@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for core.skill.execution.detection module."""
 
 import asyncio

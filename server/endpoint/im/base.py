@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/endpoint/im/base.py
 IM 接入端点的协议定义和基类。

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 验证 agent 系统提示词的组装逻辑，重点检查 skills 部分是否包含本地全部 skills。
 

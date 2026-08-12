@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Post-install handler — copies skill-creator output from workspace to skills_dir."""
 
 from __future__ import annotations

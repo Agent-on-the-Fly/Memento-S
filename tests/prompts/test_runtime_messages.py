@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """单元测试 — core/prompts/templates.py: 运行时消息模板格式化。"""
 
 from __future__ import annotations

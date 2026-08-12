@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skill_executor_basic.py - SkillAgent 基础测试
 
 测试 SkillAgent 的基本功能和初始化。

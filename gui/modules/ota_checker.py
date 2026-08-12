@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Over-the-Air (OTA) Update Checker for Memento-S GUI.
 """

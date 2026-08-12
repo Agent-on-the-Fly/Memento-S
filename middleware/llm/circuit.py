@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """熔断器（Circuit Breaker）子模块。
 
 从 middleware/llm/llm_client.py 中提取的独立组件。

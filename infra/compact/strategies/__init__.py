@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """策略实现包。"""
 
 from infra.compact.strategies.base import BaseStrategy

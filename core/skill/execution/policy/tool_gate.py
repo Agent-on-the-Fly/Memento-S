@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tool gate checks during execution."""
 
 from __future__ import annotations

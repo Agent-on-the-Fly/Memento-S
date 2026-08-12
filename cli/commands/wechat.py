@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """WeChat CLI commands for Memento-S.
 
 微信管理命令：

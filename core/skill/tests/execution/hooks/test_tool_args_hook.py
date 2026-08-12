@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for ToolArgsValidationHook — core/skill/execution/hooks/tool_args_hook.py
 
 注意：参数标准化已在 ToolArgsProcessor（adapter.py 先调用）中完成。

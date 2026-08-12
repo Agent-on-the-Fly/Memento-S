@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Sandbox environment builder.
 
 Builds environment variables for sandbox execution, combining:

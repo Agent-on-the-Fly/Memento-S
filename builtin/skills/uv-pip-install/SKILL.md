@@ -1,4 +1,5 @@
 ---
+# SPDX-License-Identifier: Apache-2.0
 name: uv-pip-install
 description: Install and manage Python packages using uv pip. Use when a Python import fails with ModuleNotFoundError, user asks to install a package, or a script requires a missing dependency.
 ---

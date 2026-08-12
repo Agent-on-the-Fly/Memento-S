@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Token 预算行为报告（无需 bootstrap）。
 
 运行方式:

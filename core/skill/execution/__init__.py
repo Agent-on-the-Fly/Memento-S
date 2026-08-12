@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """execution — Skill 执行基础设施"""
 
 from .agent import SkillAgent

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """infra/shared — infra 内部共享工具模块。
 
 无 core/ 依赖，所有压缩/提取逻辑集中存放。

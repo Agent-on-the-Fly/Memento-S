@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """LoopSupervisionHook — LoopDetector 的 Hook 封装。
 
 职责：

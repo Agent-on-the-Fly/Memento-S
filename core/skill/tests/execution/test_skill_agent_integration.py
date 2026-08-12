@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """集成测试：SkillAgent 端到端执行，验证 hook_context 机制。
 
 针对 SAM3 项目介绍任务，验证：

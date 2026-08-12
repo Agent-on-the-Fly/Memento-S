@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """核心抽象接口定义 — 依赖注入协议。"""
 
 from __future__ import annotations

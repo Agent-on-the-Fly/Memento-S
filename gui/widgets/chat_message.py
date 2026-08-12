@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Chat message widget with Markdown and code highlighting support
 """

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 GUI Settings LLM Profile 增删测试
 

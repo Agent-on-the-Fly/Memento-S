@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """压缩模块共享常量。
 
 消除 magic numbers，所有默认值集中定义。

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """向量存储 - sqlite-vec 数据库管理 embedding
 
 通用组件，可用于 skill embedding 和 conversation embedding 等场景。

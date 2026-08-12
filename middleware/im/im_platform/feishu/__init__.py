@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """飞书（Lark）平台包。"""
 from .platform import FeishuPlatform
 from .receiver import FeishuReceiver, start_feishu_receiver

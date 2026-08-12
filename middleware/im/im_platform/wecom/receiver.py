@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 企业微信智能机器人长连接消息接收器。
 

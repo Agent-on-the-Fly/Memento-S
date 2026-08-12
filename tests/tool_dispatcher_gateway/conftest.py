@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tool Dispatcher Gateway fixtures
 
 Note: These tests need to be updated to use the new SkillProvider API

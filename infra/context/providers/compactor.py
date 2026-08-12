@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CompactorProvider — Pre-API 压缩流水线抽象。
 
 抽象 LLM 调用前的上下文压缩能力：Microcompact → Budget Guard → SM Compact → Emergency。

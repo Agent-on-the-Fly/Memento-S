@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Bounded Context Memory 演示脚本。
 
 模拟一个完整的 agent session：

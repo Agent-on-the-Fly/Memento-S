@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AutoConsolidationLoop — 独立于 Dream 的自动整合后台任务。"""
 
 from __future__ import annotations

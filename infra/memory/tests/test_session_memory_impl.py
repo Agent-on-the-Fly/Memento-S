@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for SessionMemory lifecycle.
 
 Verifies: setup, worklog append, LLM update, SM compact, recall.

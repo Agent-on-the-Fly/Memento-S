@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Test fixtures for core.skill.execution.detection module.
 
 Shared fixtures are provided by the project root conftest.py

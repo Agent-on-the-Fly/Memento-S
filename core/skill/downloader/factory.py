@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """下载器工厂 —— 创建预配置的下载管理器。"""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """infra/memory/impl — Memory 具体实现。
 
 SessionMemory: L1 Session Memory

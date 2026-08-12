@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Hook 生命周期系统 — 细粒度事件钩子。
 
 HookExecutor 作为 SkillAgent/SkillDispatcher 层的细粒度生命周期控制，

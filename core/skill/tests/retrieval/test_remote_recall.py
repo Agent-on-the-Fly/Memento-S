@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_remote_recall.py — RemoteRecall 单元测试
 
 测试远程 API 召回功能。

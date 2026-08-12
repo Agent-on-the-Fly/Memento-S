@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """core.context.session.types — pure data schemas, zero behavior.
 
 This module contains dataclasses that represent pure state without methods.

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 测试自然语言 search → execute 完整流程（真实云端服务）
 

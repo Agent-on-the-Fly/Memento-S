@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """infra/compact 模块的单元测试。"""
 
 import pytest

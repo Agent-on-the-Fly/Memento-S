@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MCP 配置管理器
 
 独立管理 ~/memento_s/mcp.json，与 ConfigManager（config.json）解耦。

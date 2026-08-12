@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SkillMarket uninstall 接口测试
 
 测试使用 skill.name 卸载 skill，并验证所有存储都被清理。

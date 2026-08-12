@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """remote_recall — 远程 Skill Retrieval API 客户端
 
 通过 HTTP 调用独立部署的 skill_retrieval_api 微服务，

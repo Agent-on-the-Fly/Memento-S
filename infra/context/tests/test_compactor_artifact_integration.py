@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for TokenBudgetCompactor + ArtifactProviderImpl integration.
 
 Verifies the Pre-API pipeline end-to-end: tool result persistence,

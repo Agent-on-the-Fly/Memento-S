@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ToolArgsValidationHook — ToolArgsProcessor 的补充层。
 
 在 _args_processor.process() 之后执行，对已处理好的参数做补充分析。

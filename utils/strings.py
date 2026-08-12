@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """String formatting utilities - 字符串格式转换工具
 
 提供各种命名风格之间的相互转换，不依赖任何业务逻辑。

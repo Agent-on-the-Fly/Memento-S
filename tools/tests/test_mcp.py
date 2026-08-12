@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for tools/mcp/client.py"""
 
 from __future__ import annotations

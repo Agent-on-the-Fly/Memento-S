@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Step boundary logic — reflection, replan routing, inter-step data injection, L1 update."""
 
 from __future__ import annotations

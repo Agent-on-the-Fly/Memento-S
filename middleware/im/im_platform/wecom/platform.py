@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 企业微信（WeCom）Open API 适配器。
 

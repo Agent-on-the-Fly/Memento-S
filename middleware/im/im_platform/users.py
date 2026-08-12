@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 用户与群组操作封装函数。
 

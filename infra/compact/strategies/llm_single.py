@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """LLM 单消息压缩策略 — 压缩单条超大消息。"""
 
 from __future__ import annotations

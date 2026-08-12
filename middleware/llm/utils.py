@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """LLM 工具函数。
 
 提供 raw tool call token 检测与清理。

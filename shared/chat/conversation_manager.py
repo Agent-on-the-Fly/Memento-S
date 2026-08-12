@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Conversation Manager — 多轮对话管理.
 
 管理 Session 内的 Conversation 创建、查询、更新，以及对话历史.

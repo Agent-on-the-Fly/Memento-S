@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Runtime execution context for tool calls."""
 
 from __future__ import annotations

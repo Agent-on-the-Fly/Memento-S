@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_skill_initializer.py - SkillInitializer 测试
 
 测试 SkillInitializer 初始化 skill 系统的功能。

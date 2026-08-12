@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """shared/schema/skill_execution.py — Skill 执行层契约类型（跨层共享）。
 
 从 core/skill/schema.py 迁移：

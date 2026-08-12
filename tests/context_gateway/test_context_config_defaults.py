@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ContextConfig 默认值 + 自定义覆盖测试。"""
 from __future__ import annotations
 

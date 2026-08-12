@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 WeChat (Personal) Integration via OpenClaw Weixin Python SDK
 

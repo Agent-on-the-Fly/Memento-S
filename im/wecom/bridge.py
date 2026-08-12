@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """企业微信 Agent 桥接
 
 封装企业微信平台的 Agent 调用逻辑，处理企业微信消息并与 Agent 交互。

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 文件与资源操作封装函数。
 

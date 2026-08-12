@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """存储抽象层 — 压缩模块的内容落盘接口。"""
 
 from __future__ import annotations

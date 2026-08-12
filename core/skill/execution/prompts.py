@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill execution prompts (ReAct mode).
 
 Changes from original:

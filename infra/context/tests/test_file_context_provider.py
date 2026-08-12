@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for infra/context/impl/file_context.py — FileContextProvider.
 
 这些测试通过实际 ContextManager、SessionMemory 和 ContextMemory（使用 tmp 目录）

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Hallucination guard — validates skill names before execution."""
 
 from __future__ import annotations

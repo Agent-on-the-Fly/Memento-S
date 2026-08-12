@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Update Notifier UI for Memento-S GUI.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """PathPolicyHook — 分层路径策略 hook（BEFORE_TOOL_EXEC）。"""
 
 from __future__ import annotations

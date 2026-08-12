@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Compact 超阈值路径: LLM 全量合并消息。"""
 from __future__ import annotations
 

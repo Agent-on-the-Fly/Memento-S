@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Storage module: async SQLite with Session + Conversation two-layer architecture."""
 
 from middleware.storage.models import (

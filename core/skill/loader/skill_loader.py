@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill Loader - 从磁盘加载技能
 
 负责从磁盘加载 skill 文件，解析 SKILL.md 和关联资源。

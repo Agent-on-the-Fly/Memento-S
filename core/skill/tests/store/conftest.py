@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """store 测试共享 fixtures
 
 提供所有存储类的 fixtures，使用真实配置创建。

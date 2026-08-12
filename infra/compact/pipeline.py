@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """压缩管道 — 渐进式压缩编排引擎。"""
 
 from __future__ import annotations

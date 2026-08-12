@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SkillToolAdapter: bridges SkillAgent to tools/registry.
 
 Migrated from tool_bridge/ — now includes ENV VAR JAIL injection

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """USER.md evolution prompt templates — dialectic multi-pass reasoning.
 
 Pass 0: Observation — cold/warm observation across multiple dimensions

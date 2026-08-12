@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Test fixtures for core.skill.execution.detection module.
 
 Fixtures from tools/tests/conftest.py are automatically available

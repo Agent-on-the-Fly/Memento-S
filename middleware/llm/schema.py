@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 LLM 统一数据结构和响应定义。
 """

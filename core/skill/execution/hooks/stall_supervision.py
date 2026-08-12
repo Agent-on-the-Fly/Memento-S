@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """StallSupervisionHook — 多维进展检测 Hook。
 
 职责：

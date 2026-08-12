@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """core.context — unified context management API.
 
 Public entry points:

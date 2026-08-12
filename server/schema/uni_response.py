@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/schema/uni_response.py
 统一响应格式 (UniResponse)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill Agent 与 Tools 映射关系测试
 
 测试范围:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ToolResultSupervisionHook — ToolResultProcessor 的补充层。
 
 在 _result_processor.process() 之后执行，对已分类的结果做补充分析。

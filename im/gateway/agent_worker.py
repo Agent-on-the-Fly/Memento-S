@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Gateway 模式 Agent Worker
 
 通过 WebSocket 连接到 Gateway，接收来自 IM 渠道的消息，

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Atomic tools layer — stateless, pure async callables.
 
 Each tool is a simple async function with an attached _schema attribute

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Microcompact — 零 LLM 调用的旧 tool result 内容清除。
 
 迁移自 core/context/microcompact.py。

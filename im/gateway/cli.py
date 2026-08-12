@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Gateway 模式桥接 CLI 命令"""
 
 from __future__ import annotations

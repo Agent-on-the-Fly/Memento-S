@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for daemon/dream/consolidator.py — DreamConsolidator.
 
 Verifies: lock acquisition, staging gate, deep_run delegation.

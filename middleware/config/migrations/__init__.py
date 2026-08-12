@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Configuration migrations module.
 
 Handles configuration version migrations and upgrades.

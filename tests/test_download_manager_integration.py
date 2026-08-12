@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Download Manager 集成测试 —— 真实 GitHub 下载测试
 
 此测试类对 download_manager 进行真实调用，不进行 mock。

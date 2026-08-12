@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """
 单元测试: SkillAgent (原 SkillExecutor)
 

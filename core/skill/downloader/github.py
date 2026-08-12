@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """GitHub skill 下载器实现。"""
 
 from __future__ import annotations

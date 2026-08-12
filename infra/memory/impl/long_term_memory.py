@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """LongTermMemory — indexed topic files.
 
 MEMORY.md serves as the entrypoint index.

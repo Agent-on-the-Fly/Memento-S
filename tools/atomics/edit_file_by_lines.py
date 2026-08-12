@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Edit file by line range tool."""
 
 from __future__ import annotations

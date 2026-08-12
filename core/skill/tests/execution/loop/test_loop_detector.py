@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Comprehensive tests for LoopDetector — core/skill/execution/loop_detector.py
 
 Covers:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """InfraService — core/ 上层对 infra/ 的唯一依赖入口。
 
 集中了 ContextProvider, CompactorProvider, ArtifactProvider

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Memento-S Agent utility functions.
 
 Contains only pure utility functions used by agent.py and phases/.

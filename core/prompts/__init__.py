@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Agent prompts and templates."""
 
 from .prompt_builder import PromptBuilder

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Pytest 配置文件 — tests/prompts/"""
 
 import os

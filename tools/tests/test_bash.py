@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Bash tool integration tests.
 
 Tests for tools/atomics/bash.py — covers shell syntax support,

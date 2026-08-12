@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Context recall handler — delegates to RecallEngine for session memory."""
 
 from __future__ import annotations

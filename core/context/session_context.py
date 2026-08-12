@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SessionContext — unified session identity and path container.
 
 Scope: core/ module only. Callers outside core/ (server/, cli/, gui/) pass

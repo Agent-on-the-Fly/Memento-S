@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """集成测试 — ContextManager.persist_tool_result + ArtifactStore: tool message 格式 + seq 注入。"""
 
 from __future__ import annotations

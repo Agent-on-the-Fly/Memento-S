@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ContextProvider — Context 唯一抽象接口。
 
 所有 Context 实现必须实现此接口，使 Context 管理与 Agent 解耦。

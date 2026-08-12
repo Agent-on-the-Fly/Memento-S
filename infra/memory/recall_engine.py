@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """RecallEngine — unified recall interface across L1, L2, and artifact sources.
 
 Three public modes:

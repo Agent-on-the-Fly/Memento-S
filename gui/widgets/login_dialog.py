@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Login dialog widget for Memento-S GUI.
 

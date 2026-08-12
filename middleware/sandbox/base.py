@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Sandbox base classes and factory."""
 
 from __future__ import annotations

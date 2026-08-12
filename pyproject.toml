@@ -1,6 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
 [project]
 name = "memento-s"
-version = "0.3.8"
+version = "0.4.0"
 description = "A skill-centric runtime for persistent and extensible LLM agents"
 readme = "README.md"
 license = "Apache-2.0"
@@ -96,8 +97,8 @@ app.name            = "memento-s"
 app.product         = "Memento-S"
 app.org             = "com.yangtzeailab.memento-s"
 app.bundle_id       = "com.yangtzeailab.memento-s.app"
-app.build_version   = "0.3.8"
-app.build_number    = 8
+app.build_version   = "0.4.0"
+app.build_number    = 9
 
 [tool.flet.app.macos]
 # 高分辨率 + 网络/文件权限（Flet 本地服务需要）
@@ -108,7 +109,7 @@ entitlements  = { "com.apple.security.network.client" = true, "com.apple.securit
 [tool.briefcase]
 project_name = "Memento-S"
 bundle = "com.memento-s"
-version = "0.3.8"
+version = "0.4.0"
 
 [tool.briefcase.app.memento-s]
 formal_name = "Memento-S"
@@ -169,8 +170,13 @@ console_app = false
 packages = ["cli", "core", "middleware", "gui", "utils", "builtin", "daemon", "infra", "tools", "shared", "im", "server"]
 include = [
     "bootstrap.py",
+    "version.py",
     "builtin/skills/**",
 ]
+
+[tool.hatch.build.targets.wheel.force-include]
+"bootstrap.py" = "bootstrap.py"
+"version.py" = "version.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -187,12 +193,15 @@ include = [
     "im/",
     "server/",
     "bootstrap.py",
+    "version.py",
     "pyproject.toml",
     "README.md",
     "LICENSE",
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
+    "CITATION.cff",
     "CONTRIBUTING.md",
+    "SECURITY.md",
     "howto.md",
 ]
 

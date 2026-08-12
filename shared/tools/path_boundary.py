@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Cross-platform path boundary model.
 
 Single source of truth for all path and permission logic.

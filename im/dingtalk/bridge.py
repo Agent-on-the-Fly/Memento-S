@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """钉钉 Agent 桥接
 
 封装钉钉平台的 Agent 调用逻辑，处理钉钉消息并与 Agent 交互。

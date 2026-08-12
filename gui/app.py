@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Memento-S GUI Application - Improved Version with Full TUI Features
 

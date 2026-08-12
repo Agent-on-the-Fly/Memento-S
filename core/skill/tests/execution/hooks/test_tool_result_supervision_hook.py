@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for ToolResultSupervisionHook — core/skill/execution/hooks/tool_result_supervision.py
 
 注意：错误分类已在 ToolResultProcessor（adapter.py 先调用）中完成。

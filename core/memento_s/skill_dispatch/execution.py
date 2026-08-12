@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill execution handler — executes local skills, handles download/create delegation."""
 
 from __future__ import annotations

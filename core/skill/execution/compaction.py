@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """压缩策略抽象层。
 
 架构设计：

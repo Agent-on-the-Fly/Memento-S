@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 server/schema/common.py
 通用 Pydantic 模型

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """技能领域模型（含 Agent-Skill 契约 DTO）。
 
 所有 Skill 相关的数据模型集中定义在此文件。

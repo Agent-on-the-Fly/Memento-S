@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill Gateway / Provider 真实调用测试
 
 测试范围:

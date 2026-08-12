@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ErrorPatternSupervisionHook — StatefulErrorPatternDetector 的 Hook 封装。
 
 职责：

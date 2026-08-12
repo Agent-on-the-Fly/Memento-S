@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """FileContextProvider — 基于文件的 ContextProvider 实现。
 
 使用 infra/ 内部实现（SessionMemory, LongTermMemory,

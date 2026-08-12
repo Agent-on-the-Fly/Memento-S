@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """skill_dispatch — split handlers for SkillDispatcher responsibilities.
 
 Handlers:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Fixtures for context module integration tests.
 
 All fixtures use real objects — no unittest.mock.

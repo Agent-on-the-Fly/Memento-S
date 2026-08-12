@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill 系统引导模块
 
 提供 `init_skill_system()` 作为项目启动的唯一入口。

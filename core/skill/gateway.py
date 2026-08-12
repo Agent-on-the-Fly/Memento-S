@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Agent-Skill 契约层：SkillGateway 实现。
 
 DTO 定义在 schema.py 中，通过 core.skill 包导入。

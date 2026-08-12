@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Token counting — delegates to ``litellm.token_counter``.
 
 litellm selects the correct tokenizer per model provider (OpenAI, Anthropic,

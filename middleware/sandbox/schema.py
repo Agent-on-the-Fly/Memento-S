@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Sandbox schema definitions.
 
 Base types for sandbox execution results.

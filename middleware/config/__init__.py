@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Memento-S 配置管理模块（文件模式）
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SkillPolicyHook — Skill 级别的策略检查 Hook。
 
 在 BEFORE_SKILL_EXEC 时执行，封装 `run_pre_execute_gate` 的所有检查逻辑：

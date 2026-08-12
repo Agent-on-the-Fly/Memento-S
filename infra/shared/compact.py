@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """共享压缩工具 — microcompact。
 
 从 infra/context/providers/microcompact_impl.py 迁移。

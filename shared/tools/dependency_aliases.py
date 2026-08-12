@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Centralized dependency alias normalization.
 
 Single source of truth for mapping import-style names to canonical install specs.

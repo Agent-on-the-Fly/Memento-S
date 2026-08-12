@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 异步 LLM 客户端 — 统一调用接口。
 

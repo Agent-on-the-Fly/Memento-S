@@ -2,24 +2,22 @@
 
 ## 一、项目概述
 
-Memento-S 是一个**基于 Electron + Vue 3 的桌面应用程序**，采用前后端分离架构。Electron 渲染进程（Vue 3）与 Python 后端（FastAPI）通过 IPC + HTTP 进行通信。
+Memento-S 是一个 Python agent runtime。桌面界面使用 Flet，并在同一 Python
+进程中直接调用 agent、配置、存储和技能服务。CLI、HTTP 服务和 IM gateway
+复用相同的核心与中间件层。
 
 ## 二、整体架构图
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         GUI Layer (Electron + Vue 3)                  │
+│                         Interface Layer                             │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Electron Main Process (main.ts)                            │   │
-│  │  ├── IPC Handlers (ipc-handlers.ts)                         │   │
-│  │  ├── Python Process Manager (python-process.ts)              │   │
-│  │  └── Auto-updater (updater.ts)                              │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Vue 3 Renderer (src/) - Pinia stores, API layer, UI       │   │
+│  │  Flet desktop GUI (`gui/app.py`)                            │   │
+│  │  Typer CLI (`cli/main.py`)                                  │   │
+│  │  HTTP/SSE service and IM gateway (`server/`, `middleware/`) │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │                              │                                      │
-│                      IPC → HTTP 127.0.0.1:18765                    │
+│                   Direct Python calls / events                      │
 │                              ▼                                      │
 ├─────────────────────────────────────────────────────────────────────┤
 │                     核心逻辑层 (Core)                               │
@@ -47,28 +45,28 @@ Memento-S 是一个**基于 Electron + Vue 3 的桌面应用程序**，采用前
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## 三、Electron GUI 调用的后端类
+## 三、Flet GUI 调用的运行时组件
 
-### 3.1 Electron GUI 直接导入的后端模块
+### 3.1 GUI 直接导入的运行时模块
 
 | 前端调用 | 后端类/模块 | 功能说明 |
 |---------|------------|---------|
-| `from core.memento_s import MementoSAgent` | **MementoSAgent** | AI Agent 核心类，处理用户消息、意图识别、计划生成、执行、反思 |
+| `from core.memento_s import MementoSAgent` | **MementoSAgent** | Agent 核心类，处理用户消息、意图识别、计划生成、执行、反思 |
 | `from core.skill import SkillGateway` | **SkillGateway** | 技能网关，管理技能的发现、检索、执行、下载 |
 | `from middleware.llm import LLMClient` | **LLMClient** | LLM 客户端，基于 litellm 调用各种大模型 |
 | `from middleware.config import g_config` | **ConfigManager** (g_config) | 全局配置管理器 |
 | `from shared.chat import ChatManager` | **ChatManager** | 会话管理器，管理 Session 和 Conversation |
 | `from utils.event_bus import event_bus` | **EventBus** | 事件总线，用于跨层通信 |
 
-### 3.2 Electron GUI 关键模块及其调用的后端功能
+### 3.2 Flet GUI 关键模块及其调用的运行时功能
 
 | GUI 模块 | 主要功能 | 调用的后端 |
 |---------|---------|-----------|
-| **Electron IPC** | 发送消息、处理 AI 响应流 | MementoSAgent.run() via HTTP API |
-| **会话管理** | 会话管理 | ChatManager (Session/Conversation) via HTTP API |
-| **认证面板** | 认证服务 | HTTP API (/api/v1/auth/*) |
-| **设置面板** | 设置面板 | g_config (ConfigManager) via HTTP API |
-| **技能市场** | 技能市场 | SkillGateway, SkillMarket via HTTP API |
+| **`gui/app.py`** | 发送消息、处理 agent 事件流 | `MementoSAgent` / protocol events |
+| **会话管理** | 会话管理 | `ChatManager` (Session/Conversation) |
+| **认证面板** | 认证服务 | `gui/modules/auth_service.py` |
+| **设置面板** | 设置面板 | `g_config` (`ConfigManager`) |
+| **技能市场** | 技能市场 | `SkillGateway`, `SkillMarket` |
 
 ## 四、后端核心类详解
 
@@ -176,27 +174,23 @@ class Gateway:
 - Webhook 服务器: 渠道回调
 - 消息路由和分发
 
-## 五、前后端通信方式
+## 五、界面与运行时通信方式
 
-### 5.1 IPC 调用后端 FastAPI (主要方式)
+### 5.1 Flet 进程内调用（桌面 GUI）
 
-Electron 主进程通过 IPC（`ipcRenderer.invoke`）向 Python 后端（FastAPI，端口 18765）发送 HTTP 请求：
+Flet GUI 与 agent runtime 位于同一 Python 进程。界面 controller 直接调用
+`MementoSAgent`、`ChatManager` 和 `SkillGateway`，并消费 protocol event stream：
 
-```typescript
-// Electron renderer 中调用后端
-const result = await window.electronAPI.invoke('chat:stream', { session_id, message });
+```python
+from core.memento_s import MementoSAgent
+from shared.chat import ChatManager
+
+agent = MementoSAgent()
+# GUI controllers iterate the agent's async event stream and update Flet controls.
 ```
 
-```typescript
-// Electron main process 中转发
-ipcMain.handle('chat:stream', async (event, { session_id, message }) => {
-  const response = await fetch('http://127.0.0.1:18765/api/v1/chat/stream', {
-    method: 'POST',
-    body: JSON.stringify({ session_id, message }),
-  });
-  return response.json();
-});
-```
+The optional HTTP/SSE service remains a separate interface for API clients; it
+is not an Electron-to-Python bridge.
 
 ### 5.2 AG-UI 协议 (事件流)
 
@@ -373,7 +367,7 @@ CREATE VIRTUAL TABLE conversation_embeddings USING vec0(
 
 | 模块 | 路径 |
 |-----|------|
-| GUI 入口 | `electron/electron/main.ts` |
+| GUI 入口 | `gui/app.py` (`memento-gui`) |
 | Agent 核心 | `core/memento_s/agent.py` |
 | Skill 网关 | `core/skill/gateway.py` |
 | LLM 客户端 | `middleware/llm/llm_client.py` |
@@ -386,9 +380,9 @@ CREATE VIRTUAL TABLE conversation_embeddings USING vec0(
 
 | 方面 | 说明 |
 |-----|------|
-| **架构类型** | 前后端分离 (Electron + FastAPI) |
-| **GUI 框架** | Electron (Vue 3) |
-| **通信方式** | IPC → HTTP 127.0.0.1:18765 + 事件流 + 事件总线 |
+| **架构类型** | 分层 Python runtime，共享 CLI、GUI、HTTP/SSE 和 IM 接口 |
+| **GUI 框架** | Flet |
+| **通信方式** | 进程内调用 + protocol event stream + event bus；HTTP/SSE 为可选外部接口 |
 | **AI 能力** | MementoSAgent (多阶段 Agent) |
 | **LLM 集成** | litellm (多提供商) |
 | **技能系统** | SkillGateway (技能市场) |

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """shared/fs/types - 统一的文件系统监控类型定义。
 
 整合并统一以下来源的类型：

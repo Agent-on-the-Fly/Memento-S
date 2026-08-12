@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared prompt strings — 无 core/ 依赖的纯数据常量。
 
 迁移自 core/context/prompts.py。

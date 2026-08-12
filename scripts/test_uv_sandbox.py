@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Manual end-to-end tests for UvLocalSandbox.
 
 Run:

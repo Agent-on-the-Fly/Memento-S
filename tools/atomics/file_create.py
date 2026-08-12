@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """File create tool."""
 
 from __future__ import annotations

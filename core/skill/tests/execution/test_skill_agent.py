@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for SkillAgent — core/skill/execution/agent.py"""
 
 from __future__ import annotations

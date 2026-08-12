@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """统一的 Result 类型 — 用于跨层错误传播。
 
 提供 Ok / Err 两种结果变体，模仿 Rust 的 Result 模式。

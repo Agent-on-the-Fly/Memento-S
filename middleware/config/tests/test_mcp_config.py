@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 MCP Config 运行时读写测试
 

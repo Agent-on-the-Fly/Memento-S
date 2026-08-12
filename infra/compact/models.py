@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """数据类型定义 — 压缩模块的核心数据结构。
 
 包括 CompactTrigger, CompactBudget, CompactContext, CompactResult, MessageGroup

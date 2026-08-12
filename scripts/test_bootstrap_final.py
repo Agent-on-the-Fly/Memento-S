@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Test bootstrap initialization via init_skill_system().
 
 This script tests the complete bootstrap flow using the proper entry point.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """UV 本地沙箱 - UvLocalSandbox 实现。"""
 
 from __future__ import annotations

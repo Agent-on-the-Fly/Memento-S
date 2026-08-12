@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """OpenAI 兼容 Embedding API 客户端 — 轻量级即用即走模式
 
 参考 LLMClient 设计，无需初始化，按需创建使用。

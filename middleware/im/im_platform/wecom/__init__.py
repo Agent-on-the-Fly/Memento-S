@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """企业微信（WeCom）平台包。"""
 from .platform import WecomPlatform
 from .receiver import WecomReceiver, start_wecom_receiver

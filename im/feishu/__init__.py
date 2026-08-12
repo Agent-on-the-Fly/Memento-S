@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """飞书桥接模块
 
 提供飞书平台的 Agent 桥接实现。

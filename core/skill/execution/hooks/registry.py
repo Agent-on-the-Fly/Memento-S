@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """全局 Hook 注册中心 — 单例模式，所有层共享。
 
 所有 Hook 在系统初始化时注册一次，各层按事件类型自动过滤：

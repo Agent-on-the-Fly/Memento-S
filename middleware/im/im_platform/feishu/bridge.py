@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 飞书机器人 × Agent 桥接脚本（带 DB 持久化）。
 

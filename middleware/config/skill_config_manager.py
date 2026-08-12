@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill 配置管理器。
 
 管理 ~/memento_s/skill.json 的读写和验证，

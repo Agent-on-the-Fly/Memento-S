@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Agent command for interactive chat with Memento-S."""
 
 import asyncio

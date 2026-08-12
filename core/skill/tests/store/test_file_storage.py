@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_file_storage.py - FileStorage 磁盘读写测试
 
 测试 SkillStorage 的磁盘文件读写功能（save/load/delete/list_names）。

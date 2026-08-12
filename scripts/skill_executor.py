@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Standalone SkillGateway test runner (SkillAgent-backed).
 
 Usage examples:

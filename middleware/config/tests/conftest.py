@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 middleware.config 测试的共享 fixtures
 """

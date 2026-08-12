@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Test Agent error handling through event collection.
 
 Tests how Agent handles various error scenarios:

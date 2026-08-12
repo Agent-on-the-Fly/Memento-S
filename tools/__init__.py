@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Memento-S unified tool registry and execution interface.
 
 Architectural layers:

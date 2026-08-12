@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """IM Bridge - 即时通讯平台 Agent 桥接模块
 
 顶层 IM 调用入口，与 gui/、cli/ 平级。

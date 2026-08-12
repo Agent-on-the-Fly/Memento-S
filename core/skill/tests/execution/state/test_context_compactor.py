@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for ContextCompactor — core/skill/execution/state.py
 
 覆盖所有增强机制：

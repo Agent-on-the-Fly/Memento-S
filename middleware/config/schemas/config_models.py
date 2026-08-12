@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 Memento-S 配置模型模块
 包含所有的 Pydantic BaseModel 配置类

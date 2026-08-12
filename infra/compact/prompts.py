@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """压缩模块提示词 — 从 core/context/prompts.py 迁移。"""
 
 from __future__ import annotations

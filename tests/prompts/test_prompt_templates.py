@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """单元测试 — core/prompts/templates.py: 所有模板常量格式验证。"""
 
 from __future__ import annotations

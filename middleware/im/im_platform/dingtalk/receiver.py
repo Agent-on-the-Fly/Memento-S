@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 钉钉 Stream 模式消息接收器。
 

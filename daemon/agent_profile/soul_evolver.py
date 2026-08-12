@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SOUL.md evolution engine — SoulEvolver.
 
 SoulManager 已移至 core/agent_profile/soul_manager.py。

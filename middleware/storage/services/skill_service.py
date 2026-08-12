@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Skill service for managing skills with vector storage."""
 
 from __future__ import annotations

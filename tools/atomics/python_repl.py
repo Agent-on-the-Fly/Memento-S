@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Python REPL tool powered by UV sandbox."""
 
 from __future__ import annotations

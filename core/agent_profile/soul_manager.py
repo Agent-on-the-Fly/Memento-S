@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SoulManager — SOUL.md 文件 I/O + TTL 缓存。
 
 对称于 UserManager，管理 SOUL.md 的读写和增量更新。

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 LLM 相关异常定义。
 """

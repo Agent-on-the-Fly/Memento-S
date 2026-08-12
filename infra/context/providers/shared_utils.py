@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared message utilities — 无 core/ 依赖的纯函数。
 
 迁移自 core/context/message_utils.py 和 core/context/compaction.py。

@@ -1,0 +1,54 @@
+cff-version: 1.2.0
+message: >-
+  If you use Memento-Skills in research, please cite the software and the
+  accompanying paper.
+type: software
+title: "Memento-Skills: Let Agents Design Agents"
+version: 0.4.0
+authors:
+  - family-names: Zhou
+    given-names: Huichi
+  - family-names: Guo
+    given-names: Siyuan
+  - family-names: Liu
+    given-names: Anjie
+  - family-names: Yu
+    given-names: Zhongwei
+  - family-names: Gong
+    given-names: Ziqin
+  - family-names: Zhao
+    given-names: Bowen
+  - family-names: Chen
+    given-names: Zhixun
+  - family-names: Zhang
+    given-names: Menglong
+  - family-names: Chen
+    given-names: Yihang
+  - family-names: Li
+    given-names: Jinsong
+  - family-names: Yang
+    given-names: Runyu
+  - family-names: Liu
+    given-names: Qiangbin
+  - family-names: Yu
+    given-names: Xinlei
+  - family-names: Zhou
+    given-names: Jianmin
+  - family-names: Wang
+    given-names: Na
+  - family-names: Sun
+    given-names: Chunyang
+  - family-names: Wang
+    given-names: Jun
+repository-code: "https://github.com/Memento-Teams/Memento-Skills"
+url: "https://skills.memento.run/"
+license: Apache-2.0
+keywords:
+  - large language model agents
+  - agent skills
+  - procedural memory
+  - software frameworks
+identifiers:
+  - type: url
+    value: "https://arxiv.org/abs/2603.18743"
+    description: Accompanying research paper

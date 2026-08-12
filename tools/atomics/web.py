@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Web search and fetch tools."""
 
 from __future__ import annotations

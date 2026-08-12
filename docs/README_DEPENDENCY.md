@@ -122,14 +122,11 @@ name: my-skill
 ## Testing
 
 ```python
-from core.skill.execution.dependency_installer import install_skill_dependencies
-from pathlib import Path
+from middleware.sandbox.uv import UvLocalSandbox
 
-success, error = install_skill_dependencies(
-    dependencies=['pandas', 'openpyxl'],
-    skill_name='test-skill',
-    venv_path=Path('.venv'),
-)
+# The normal application bootstrap loads g_config before constructing a sandbox.
+sandbox = UvLocalSandbox()
+success, error = sandbox.install_python_deps(['pandas', 'openpyxl'])
 
 print(f"Success: {success}")
 if not success:
@@ -138,7 +135,7 @@ if not success:
 
 ## Implementation Files
 
-- `core/skill/execution/dependency_installer.py` — Installation logic
+- `middleware/sandbox/uv.py` — Local sandbox environment and dependency installation
 - `core/skill/gateway.py` — Integration point (before SkillAgent.run)
 - `core/skill/execution/policy/pre_execute.py` — Dependency checking
 - `shared/tools/dependency_aliases.py` — Import name resolution

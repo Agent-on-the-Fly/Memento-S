@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """集成测试 — core/context/context_manager.py: ContextManager 组装与 append 逻辑。"""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """ContextManager.append() 追加消息 + 自动 compress/compact 测试。"""
 from __future__ import annotations
 

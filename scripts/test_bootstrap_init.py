@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Test complete bootstrap initialization flow.
 
 This script tests the full initialization process including:

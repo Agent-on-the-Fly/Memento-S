@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for InfraService — single entry point for core/ to infra/.
 
 Verifies: InfraService construction, all property accessors, integration.

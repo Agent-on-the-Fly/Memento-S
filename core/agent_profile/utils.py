@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SOUL.md parsing and formatting utilities."""
 
 from core.agent_profile.defaults import _DEFAULT_SOUL_TEMPLATE

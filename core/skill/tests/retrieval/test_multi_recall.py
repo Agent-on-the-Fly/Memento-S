@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """test_multi_recall.py — MultiRecall 单元测试
 
 测试多路召回合并功能。

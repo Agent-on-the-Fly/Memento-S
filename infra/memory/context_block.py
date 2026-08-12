@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Memory context block — fence tag + sanitize for system prompt injection.
 
 Wraps L1+L2 memory content in <memory-context> tags so the model

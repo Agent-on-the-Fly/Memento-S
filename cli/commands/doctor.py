@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Doctor command for displaying configuration and environment info."""
 
 import sys

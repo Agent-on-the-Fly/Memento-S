@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Protocol-layer enumerations — zero dependencies, leaf of the import graph."""
 
 from __future__ import annotations

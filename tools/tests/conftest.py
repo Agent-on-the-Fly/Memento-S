@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared test fixtures for tools module tests."""
 
 from __future__ import annotations

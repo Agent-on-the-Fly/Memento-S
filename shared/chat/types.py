@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared Chat Types — 统一的数据类型定义.
 
 提供 Session 和 Conversation 的数据类，用于类型安全和清晰的接口.

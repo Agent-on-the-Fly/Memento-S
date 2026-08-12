@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for LongTermMemory — indexed topic files.
 
 Verifies: accumulate_session, write_topic, list_topics, apply_consolidation_result.

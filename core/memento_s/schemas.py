@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Agent configuration — the single AgentConfig dataclass.
 
 Phase-specific types (IntentMode, IntentResult, TaskPlan, etc.) live in their

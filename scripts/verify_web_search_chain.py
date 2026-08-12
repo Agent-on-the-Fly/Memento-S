@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Run web-search skill end-to-end to verify web tool chain.
 
 Usage:

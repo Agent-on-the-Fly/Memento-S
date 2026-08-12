@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """
 IM 平台工厂。
 

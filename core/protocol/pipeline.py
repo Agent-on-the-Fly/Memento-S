@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """AG-UI event pipeline — accumulators, sinks, and fan-out.
 
 Depends on .events and .types.

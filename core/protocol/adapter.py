@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Protocol adapter — translates semantic PhaseSignalType to wire-format events.
 
 Depends on .types and .events.

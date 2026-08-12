@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """SkillMarket install 接口集成测试
 
 测试从云端安装 skill 的完整流程。
