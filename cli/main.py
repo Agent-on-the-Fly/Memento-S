@@ -32,6 +32,7 @@ from cli.commands import (
     im_status_command,
     gateway_worker_command,
     wechat_app,
+    skills_app,
 )
 
 # 版本号管理：开发模式从 version.py 读取，打包模式从包元数据读取
@@ -123,6 +124,7 @@ def wecom() -> None:
 
 # Add wechat subcommand app
 app.add_typer(wechat_app, name="wechat", help="WeChat management commands")
+app.add_typer(skills_app, name="skills", help="Skill routing and evolution maintenance")
 
 
 @app.command()

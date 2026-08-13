@@ -8,7 +8,7 @@ from core.memento_s.schemas import AgentRuntimeConfig as AgentConfig
 
 def test_context_config_defaults():
     """所有 ContextConfig 默认值正确。"""
-    cfg = ContextConfig()
+    cfg = ContextManagerConfig()
 
     assert cfg.compaction_trigger_ratio == 0.7
     assert cfg.compress_threshold_ratio == 0.5
@@ -19,13 +19,13 @@ def test_agent_config_embeds_context_config():
     """AgentConfig 内嵌 ContextConfig。"""
     cfg = AgentConfig()
 
-    assert isinstance(cfg.context, ContextConfig)
+    assert isinstance(cfg.context, ContextManagerConfig)
     assert cfg.context.compaction_trigger_ratio == 0.7
 
 
 def test_context_config_custom_values():
     """ContextConfig 支持自定义覆盖。"""
-    cfg = ContextConfig(
+    cfg = ContextManagerConfig(
         compaction_trigger_ratio=0.5,
         compress_threshold_ratio=0.5,
         summary_ratio=0.2,

@@ -8,11 +8,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from middleware.config.skill_config_manager import skill_config_manager
+from middleware.config.skill_config_manager import SkillConfigManager, skill_config_manager
 from utils.strings import to_kebab_case, to_snake_case
 from utils.logger import get_logger
 
@@ -35,8 +35,8 @@ class SkillRegistry:
         registry.sync_from_disk(skills_dir, builtin_dir)
     """
 
-    def __init__(self) -> None:
-        self._manager = skill_config_manager
+    def __init__(self, manager: SkillConfigManager | None = None) -> None:
+        self._manager = manager or skill_config_manager
 
     # ── 基础读写 ─────────────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ class SkillRegistry:
                 logger.debug("sync_from_disk: removed '{}' (no longer on disk)", name)
 
         # 遍历磁盘：添加新 skill
-        now = datetime.utcnow().isoformat() + "Z"
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         for name, skill_path in disk_skills.items():
             if name not in registry_skills:
                 # location 统一指向 skills_dir（用户目录），与代码目录解耦

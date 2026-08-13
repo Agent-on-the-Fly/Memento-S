@@ -35,8 +35,17 @@ from shared.fs.types import (
     FsSnapshotEntry,
     IS_POSIX,
     DEFAULT_IGNORE_DIRS,
+    DEFAULT_IGNORE_PATTERNS,
     resolve_path_safe,
 )
+
+
+class FsChangeCollection(list[FsChange]):
+    """List of changes with the legacy ``.changes`` access path."""
+
+    @property
+    def changes(self) -> "FsChangeCollection":
+        return self
 
 
 # =============================================================================
@@ -53,13 +62,13 @@ class SnapshotConfig:
     # 忽略的目录
     ignore_dirs: frozenset[str] = DEFAULT_IGNORE_DIRS
     # 忽略的文件模式
-    ignore_patterns: frozenset[str] = frozenset()
+    ignore_patterns: frozenset[str] = DEFAULT_IGNORE_PATTERNS
     # workspace 根目录
     workspace_root: Path | None = None
 
     def is_ignored_dir(self, dirname: str) -> bool:
         """检查目录是否应被忽略。"""
-        return dirname in self.ignore_dirs
+        return dirname.startswith(".") or dirname in self.ignore_dirs
 
     def is_ignored_file(self, filename: str) -> bool:
         """检查文件是否应被忽略。"""
@@ -256,7 +265,7 @@ class FsSnapshotManager:
         self,
         before_id: str,
         after_id: str,
-    ) -> list[FsChange]:
+    ) -> FsChangeCollection:
         """
         对比两个快照，返回详细变化列表。
 
@@ -271,9 +280,9 @@ class FsSnapshotManager:
         after = self._snapshots.get(after_id)
 
         if before is None or after is None:
-            return []
+            return FsChangeCollection()
 
-        return before.diff(after)
+        return FsChangeCollection(before.diff(after))
 
     def get_snapshot(self, execution_id: str) -> FsSnapshot | None:
         """获取之前拍摄的快照。"""
@@ -286,6 +295,10 @@ class FsSnapshotManager:
     def release(self, execution_id: str) -> None:
         """释放指定 execution_id 的快照，释放内存。"""
         self._snapshots.pop(execution_id, None)
+
+    def clear_snapshot(self, execution_id: str) -> None:
+        """Backward-compatible alias for releasing one named snapshot."""
+        self.release(execution_id)
 
     def clear(self) -> None:
         """清空所有快照。"""

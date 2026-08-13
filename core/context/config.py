@@ -33,6 +33,12 @@ class ContextManagerConfig:
     summary_ratio: float = 0.15
     """compress/compact 摘要输出上限 = input_budget * ratio。"""
 
+    compaction_trigger_ratio: float = 0.7
+    """Compatibility threshold for eager append-time compaction."""
+
+    compress_threshold_ratio: float = 0.5
+    """Compatibility threshold for single-message compression."""
+
     embedding_enabled: bool = False
     """是否启用 embedding 语义相关性过滤（暂不支持）。"""
 
@@ -91,6 +97,7 @@ class ContextManagerConfig:
     def __post_init__(self) -> None:
         _ratio_fields = (
             "history_budget_ratio", "summary_ratio",
+            "compaction_trigger_ratio", "compress_threshold_ratio",
             "persist_ratio", "extract_ratio",
             "preview_ratio", "slim_ratio",
             "sm_compact_min_ratio", "sm_compact_max_ratio",

@@ -89,7 +89,7 @@ During the launch period, new app users can receive a generous token package for
 <p align="center">
   <img src="Figures/figure2.jpg" width="100%" alt="Memento-Skills framework">
 </p>
-<p align="center"><sub>Read–Execute–Reflect–Write architecture studied in the accompanying technical work. The public runtime supplies skill retrieval and execution, step reflection and replanning, explicit skill creation, and persistent local storage.</sub></p>
+<p align="center"><sub>Read–Execute–Reflect–Write architecture studied in the accompanying technical work. The public runtime supplies Qwen/keyword skill routing, execution, reflection and replanning, explicit skill creation, and guarded automatic skill repair.</sub></p>
 </td></tr>
 </table>
 
@@ -107,6 +107,8 @@ During the launch period, new app users can receive a generous token package for
 | **Source licensing** | Project-owned source files carry Apache-2.0 SPDX identifiers; separately licensed third-party material remains identified in `THIRD_PARTY_NOTICES.md`. |
 | **Installed-package CI** | Linux, macOS, and Windows install the built wheel, validate package metadata and dependencies, import public runtime modules, and exercise the CLI help entry point without credentials. |
 | **Public project guidance** | Stale implementation references are corrected, and citation and security-reporting files are included in the source distribution. |
+| **Qwen skill router** | Planning uses configurable keyword, Qwen3/Memento-Qwen, or hybrid local-skill routing with graceful fallback. |
+| **Guarded skill evolution** | Failed traces support automatic attribution, isolated file updates, static/unit/synthetic gates, atomic deployment, audit history, and rollback. |
 
 ---
 
@@ -194,6 +196,7 @@ The `shared/` package has grown beyond chat utilities into a broader foundation 
 | `docs/ARCHITECTURE.md`, `docs/API_SPEC.md` | Up-to-date architecture and API references. |
 | `docs/dependency_auto_install.md`, `docs/README_DEPENDENCY.md` | Runtime dependency model and auto-install behaviour. |
 | `docs/database_optimization.md`, `docs/uni_response_design.md` | New design notes for storage and unified response handling. |
+| `docs/QWEN_ROUTER_AND_SKILL_EVOLUTION.md` | Qwen routing and transactional Read-Write skill updates. |
 
 ### Refactors and Removals
 
@@ -310,8 +313,8 @@ richer set of learned skills.
 
 > **Core question.** How can a deployable agent organise behaviour as reusable
 > skills, reflect on execution, and persist newly authored capabilities? The
-> accompanying technical study extends these runtime primitives to automatic
-> skill learning.
+> accompanying technical study motivates the runtime's guarded automatic skill
+> repair loop.
 
 <table>
 <tr>
@@ -321,7 +324,7 @@ Step results inform whether the runtime continues, replans, or finalises.
 </td>
 <td width="33%" valign="top">
 <b>Author reusable skills</b><br>
-The runtime can explicitly create and persist skills when no existing capability is suitable.
+The runtime can create missing skills and repair an attributed skill after a failed trajectory.
 </td>
 <td width="33%" valign="top">
 <b>Run in the real world</b><br>
@@ -337,7 +340,9 @@ Local execution, persistent state, CLI, GUI, and multi-platform IM integration m
 | **Skill-centric agent runtime** | Memento-Skills ships orchestration, skill routing, execution, reflection, storage, CLI, and GUI components; third-party provenance is documented in `THIRD_PARTY_NOTICES.md`. |
 | **4-stage ReAct architecture** | Intent, Planning, Execution (multi-step ReAct loop), and Reflection — structured reasoning with a dedicated Finalize phase for result summarisation. |
 | **Designed for open-source LLM ecosystems** | The profile-based LLM layer is especially friendly to mainstream open-source model platforms such as **Kimi / Moonshot**, **MiniMax**, **GLM / Zhipu**, as well as other OpenAI-compatible endpoints. |
-| **Persistent skill lifecycle** | The runtime retrieves, executes, installs, explicitly creates, and persists reusable skills. |
+| **Qwen skill router** | Qwen3/Memento-Qwen behaviour-oriented embeddings can route a goal to a compact skill set, with keyword + dense hybrid fusion and safe fallback. |
+| **Guarded skill evolution** | Failed runs are attributed to one skill, rewritten in isolation, tested on static/unit/synthetic gates, and atomically deployed or rolled back. |
+| **Persistent skill lifecycle** | The runtime retrieves, executes, installs, creates, validates, versions, and persists reusable skills. |
 | **Skill Market** | Built-in cloud catalogue with search, download, and auto-install — share and reuse validated skills across deployments. |
 | **Multi-platform IM Gateway** | Unified real-time messaging across Feishu, DingTalk, WeCom, and WeChat with WebSocket long-connections and per-user persistent sessions. |
 | **Configuration v2** | Three-layer isolation (System / User / Runtime) with automatic migration, schema validation, and version management. |
@@ -351,9 +356,10 @@ persistent. Instead of treating tools as a flat pile of functions,
 Memento-Skills treats them as a library that can be routed, installed, authored,
 and reused over time.
 
-The runtime combines step-boundary reflection and replanning with an explicit
-skill-authoring path, allowing successful capabilities to be stored and reused
-without changing the underlying language model.
+The runtime combines step-boundary reflection and replanning with explicit skill
+authoring and guarded automatic write-back. Failed trajectories can repair the
+attributed skill without changing the underlying language model, while tests and
+directory snapshots prevent a bad candidate from replacing the active version.
 
 ## What Makes It Different?
 
@@ -364,7 +370,7 @@ Memento-Skills exposes a `Read -> Execute -> Reflect -> Write` skill lifecycle.
 | **Read** | Retrieve candidate skills from the local library and remote catalogue instead of stuffing every skill into context. |
 | **Execute** | Run skills through tool calling and a local sandbox so the agent can act on files, scripts, webpages, and external systems. |
 | **Reflect** | Inspect step results and choose whether to continue, replan, or finalise. |
-| **Write** | Explicitly create and persist a new skill when no existing capability is suitable. |
+| **Write** | Attribute failures, update one skill in isolation, run automatic gates, then deploy or roll back; create a new skill when no capability is suitable. |
 
 This lifecycle keeps skill retrieval, execution, reflection, authoring, and
 persistence within one deployable runtime.
@@ -389,8 +395,8 @@ The two systems share a lot of DNA, but they are not centred on the same questio
 
 | Dimension | Memento-Skills | OpenClaw |
 | --- | --- | --- |
-| **Product focus** | Focused on a persistent skill lifecycle with retrieval, execution, reflection, and explicit authoring. | Focused on how an assistant gets deployed and connected to the real world. |
-| **Learning and evolution** | Research configurations study skill learning from task experience; the public runtime provides the underlying lifecycle primitives. | Capability growth is more commonly driven by external plugins, tools, and human-provided integrations. |
+| **Product focus** | Focused on a persistent skill lifecycle with routing, execution, reflection, creation, and guarded repair. | Focused on how an assistant gets deployed and connected to the real world. |
+| **Learning and evolution** | The runtime can attribute a failed trace, update one skill in isolation, test the candidate, and deploy or roll it back. | Capability growth is more commonly driven by external plugins, tools, and human-provided integrations. |
 | **Skill routing** | Treats retrieval and routing as core problems, especially when the skill library becomes large. | Better optimised for broad real-world integrations; context and hit-rate management depend more on the surrounding engineering setup. |
 | **Skill download** | Includes a cloud catalogue plus download flow, moving toward deduped and validated reusable skills. | More open-ended ecosystem growth, with quality and duplication control relying more on platform or community processes. |
 | **Skill creation** | Can explicitly create and persist a new skill when nothing suitable exists locally or remotely. | Missing skills are more often supplied by humans or installed explicitly. |
@@ -681,7 +687,7 @@ If you find Memento-Skills useful in your research, please cite:
 <details>
 <summary><b>点击展开中文摘要</b></summary>
 
-Memento-Skills 把能力组织成可检索、可执行、可持久化的 `skills`。公开运行时围绕 `Read -> Execute -> Reflect -> Write` 生命周期提供技能检索与执行、步骤反思与重新规划、显式技能创建以及本地持久化；随附技术研究则评估了自动写回的研究配置。
+Memento-Skills 把能力组织成可检索、可执行、可持久化的 `skills`。公开运行时围绕 `Read -> Execute -> Reflect -> Write` 生命周期提供 Qwen/关键词技能路由、执行、步骤反思与重新规划、显式技能创建，以及带自动归因、隔离更新、测试门禁和回滚的受控写回。
 
 和 OpenClaw 相比，两者都具备 skills、工具调用、本地执行、持久化记忆和系统化部署能力，但关注点不同。OpenClaw 更偏向让 assistant 稳定接入真实世界；Memento-Skills 更强调统一的技能生命周期与持久化运行时。
 

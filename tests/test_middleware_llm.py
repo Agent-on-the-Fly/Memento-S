@@ -21,6 +21,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -30,6 +32,8 @@ from middleware.llm import LLMClient, LLMResponse, LLMStreamChunk
 from utils.logger import setup_logger, logger
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_llm_client(profile: str | None = None, init_only: bool = False):
     """测试 LLM 客户端
 
@@ -66,6 +70,9 @@ async def test_llm_client(profile: str | None = None, init_only: bool = False):
     else:
         print(f"\n使用默认 Profile: {config.llm.active_profile}")
         print(f"  可用 profiles: {available_profiles}")
+
+    non_stream_ok = init_only
+    stream_ok = init_only
 
     try:
         print("\n【1. 初始化 LLM 客户端】")
@@ -109,6 +116,7 @@ async def test_llm_client(profile: str | None = None, init_only: bool = False):
             print(f"  Content: {response.text[:100]}...")
             print(f"  Has tool calls: {response.has_tool_calls}")
             print(f"  Finish reason: {response.finish_reason}")
+            non_stream_ok = True
         except Exception as e:
             print(f"✗ 调用失败: {e}")
 
@@ -133,6 +141,7 @@ async def test_llm_client(profile: str | None = None, init_only: bool = False):
 
             full_content = "".join(content_parts)
             print(f"\n  完整内容长度: {len(full_content)} chars")
+            stream_ok = True
         except Exception as e:
             print(f"\n✗ 流式调用失败: {e}")
 
@@ -145,6 +154,8 @@ async def test_llm_client(profile: str | None = None, init_only: bool = False):
     print("\n" + "=" * 70)
     print("✓ 测试完成")
     print("=" * 70)
+    assert non_stream_ok, "非流式 LLM 调用失败"
+    assert stream_ok, "流式 LLM 调用失败"
 
 
 def main():

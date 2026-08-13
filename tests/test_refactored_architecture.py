@@ -8,6 +8,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -17,7 +19,8 @@ from middleware.storage.core.engine import get_db_manager
 from utils.logger import setup_logger
 
 
-async def test_refactored_architecture():
+@pytest.mark.asyncio
+async def test_refactored_architecture(tmp_path):
     """测试新架构"""
     print("=" * 70)
     print("测试重构后的架构：Session + Conversation")
@@ -26,10 +29,7 @@ async def test_refactored_architecture():
     setup_logger()
 
     # 初始化数据库
-    from middleware.config.config_manager import ConfigManager
-
-    manager = ConfigManager()
-    db_path = manager.get_db_path()
+    db_path = tmp_path / "memento_s.db"
     db_url = f"sqlite+aiosqlite:///{db_path}"
 
     db_manager = get_db_manager()
@@ -117,6 +117,7 @@ async def test_refactored_architecture():
     print("\n【清理】")
     await ChatManager.delete_session(session.id)
     await ChatManager.delete_session(session2.id)
+    await db_manager.dispose()
     print("✓ 删除测试数据")
 
     print("\n" + "=" * 70)

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,10 +70,11 @@ class ConversationService(BaseService):
         if sequence is None:
             sequence = await self._get_next_sequence(db, data.session_id)
 
+        record_id = data.id or str(uuid.uuid4())
         obj = Conversation(
-            **({"id": data.id} if data.id else {}),
+            id=record_id,
             session_id=data.session_id,
-            conversation_id=data.conversation_id,
+            conversation_id=data.conversation_id or record_id,
             sequence=sequence,
             role=data.role,
             title=data.title,

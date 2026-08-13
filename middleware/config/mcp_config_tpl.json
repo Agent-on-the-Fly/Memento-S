@@ -1,5 +1,21 @@
 {
   "enabled": true,
   "mcp": {
+    "github": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": null
+      },
+      "enabled": false
+    },
+    "filesystem": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "environment": {},
+      "enabled": false
+    }
   }
 }

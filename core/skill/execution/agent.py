@@ -16,11 +16,14 @@ Detection architecture (long-term fix):
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import platform
 import re
 from pathlib import Path
 from typing import Any
+
+import tools
 
 from shared.schema import SkillConfig
 from core.skill.execution.adapter import SkillToolAdapter
@@ -66,6 +69,10 @@ class SkillAgent:
         """
         self._config = config
         self._llm = llm if llm is not None else LLMClient()
+        # Keep these attributes for integrations that still inspect the legacy
+        # SkillAgent surface. Policy enforcement itself is handled by hooks.
+        self._policy_manager = policy_manager
+        self._skill_env_cache: dict[str, str] | None = None
         self._context = None  # 由 adapter.set_context() 设置
 
     async def run(
@@ -96,9 +103,15 @@ class SkillAgent:
         generated_code = ""
 
         budget = self._context_budget()
+        context_window = getattr(self._llm, "context_window", 128000)
+        max_output_tokens = getattr(self._llm, "max_tokens", 4096)
+        if not isinstance(context_window, (int, float)):
+            context_window = 128000
+        if not isinstance(max_output_tokens, (int, float)):
+            max_output_tokens = 4096
         policy = make_budget_policy(
-            context_window=getattr(self._llm, "context_window", 128000),
-            max_output_tokens=getattr(self._llm, "max_tokens", 4096),
+            context_window=int(context_window),
+            max_output_tokens=int(max_output_tokens),
         )
 
         state = ReActState(
@@ -123,8 +136,8 @@ class SkillAgent:
             f"query='{log_preview_long(query)}', "
             f"workspace_root={workspace_root}, "
             f"run_dir={run_dir}, "
-            f"allowed_tools={skill.allowed_tools}, "
-            f"execution_mode={skill.execution_mode}, "
+            f"allowed_tools={getattr(skill, 'allowed_tools', None)}, "
+            f"execution_mode={getattr(skill, 'execution_mode', None)}, "
             f"max_turns={max_turns}"
         )
 
@@ -152,7 +165,11 @@ class SkillAgent:
             result_cache=state.result_cache,
             hook_executor=hook_executor,
         )
-        adapter.set_context(skill, workspace_root, session_id=session_id)
+        context_result = adapter.set_context(
+            skill, workspace_root, session_id=session_id
+        )
+        if inspect.isawaitable(context_result):
+            await context_result
         self._skill = skill  # 供 tool_props 注入 skill_deps 使用
 
         # ── Per-execution 层：注册状态性监督 Hook ─────────────────────────────
@@ -214,6 +231,7 @@ class SkillAgent:
         last_bash_cmd: str = ""  # 防止相同 bash 命令重复执行
         last_bash_result_hash: int = 0
         bash_repeat_count: int = 0
+        tool_name: str = ""
         last_llm_usage: Any = None  # 追踪最后 LLM 调用的 usage 信息
         last_finish_reason: str = None  # 追踪最后 LLM 调用的 finish_reason
 
@@ -969,14 +987,13 @@ class SkillAgent:
 
     def _get_tool_schemas(self, skill: Skill) -> list[dict]:
         """Get atomic + mcp tool schemas for the LLM."""
+        skill_name = getattr(skill, "name", "<unknown>")
         all_schemas: list[dict] = []
         try:
-            from tools import get_tool_schemas
-
-            atomic_schemas = get_tool_schemas(category="atomic")
+            atomic_schemas = tools.get_tool_schemas(category="atomic")
             all_schemas.extend(atomic_schemas)
             logger.debug(
-                f"[SkillAgent._get_tool_schemas] skill={skill.name}, "
+                f"[SkillAgent._get_tool_schemas] skill={skill_name}, "
                 f"atomic_count={len(atomic_schemas)}, "
                 f"atomic_tools={[s['function']['name'] for s in atomic_schemas]}"
             )
@@ -986,25 +1003,36 @@ class SkillAgent:
                 "[SkillAgent._get_tool_schemas] Failed to load atomic tool schemas"
             )
 
-        try:
-            from tools import get_tool_schemas as gts_mcp
+        if not atomic_schemas:
+            try:
+                tools.load_atomics()
+                atomic_schemas = tools.get_tool_schemas(category="atomic")
+                all_schemas.extend(atomic_schemas)
+            except Exception:
+                pass
 
-            mcp_schemas = gts_mcp(category="mcp")
+        try:
+            mcp_schemas = tools.get_tool_schemas(category="mcp")
             if mcp_schemas:
                 all_schemas.extend(mcp_schemas)
                 logger.debug(
-                    f"[SkillAgent._get_tool_schemas] skill={skill.name}, "
+                    f"[SkillAgent._get_tool_schemas] skill={skill_name}, "
                     f"mcp_count={len(mcp_schemas)}, "
                     f"mcp_tools={[s['function']['name'] for s in mcp_schemas]}"
                 )
         except Exception:
             pass
 
-        schemas = all_schemas
+        # A mocked or legacy registry may return the same schema for multiple
+        # categories. Preserve registry order while removing duplicates.
+        schemas = list({
+            schema.get("function", {}).get("name", f"__unnamed_{index}"): schema
+            for index, schema in enumerate(all_schemas)
+        }.values())
 
         if not schemas:
             logger.warning(
-                f"[SkillAgent._get_tool_schemas] skill={skill.name}, "
+                f"[SkillAgent._get_tool_schemas] skill={skill_name}, "
                 f"WARNING: tools registry is empty! "
                 f"Verify bootstrap.py calls tools.bootstrap(). "
                 f"LLM will have NO tools available — task will fail."
@@ -1012,7 +1040,7 @@ class SkillAgent:
 
         if not skill.allowed_tools:
             logger.debug(
-                f"[SkillAgent._get_tool_schemas] skill={skill.name}, "
+                f"[SkillAgent._get_tool_schemas] skill={skill_name}, "
                 f"allowed_tools=None → passing all {len(schemas)} tools to LLM"
             )
             return schemas
@@ -1020,7 +1048,7 @@ class SkillAgent:
         allowed = set(skill.allowed_tools)
         filtered = [s for s in schemas if s.get("function", {}).get("name") in allowed]
         logger.debug(
-            f"[SkillAgent._get_tool_schemas] skill={skill.name}, "
+            f"[SkillAgent._get_tool_schemas] skill={skill_name}, "
             f"allowed_tools={skill.allowed_tools}, "
             f"matched_count={len(filtered)}/{len(schemas)}, "
             f"matched_tools={[s['function']['name'] for s in filtered]}"
@@ -1028,14 +1056,18 @@ class SkillAgent:
         return filtered
 
     def _build_env_vars(
-        self, workspace_root: Path, state: ReActState
+        self, workspace_root: Path, state: ReActState | None = None
     ) -> dict[str, str]:
         """Build environment variables for tool execution (ENV VAR JAIL)."""
         env_vars: dict[str, str] = {
             "WORKSPACE_ROOT": str(workspace_root),
         }
 
-        primary = state.get_primary_artifact()
+        primary = state.get_primary_artifact() if state is not None else None
+        if not primary:
+            configured_primary = getattr(self._config, "primary_artifact_path", None)
+            if isinstance(configured_primary, (str, Path)):
+                primary = str(configured_primary)
         if primary:
             env_vars["PRIMARY_ARTIFACT_PATH"] = primary
 
@@ -1043,8 +1075,8 @@ class SkillAgent:
             "[ANALYSIS-LOG] _build_env_vars: primary_artifact={}, "
             "core_artifacts={}, preferred_ext={}, WORKSPACE_ROOT={}",
             primary,
-            dict(state.core_artifacts),
-            state.preferred_core_extension,
+            dict(state.core_artifacts) if state is not None else {},
+            state.preferred_core_extension if state is not None else None,
             str(workspace_root),
         )
 
@@ -1113,7 +1145,7 @@ class SkillAgent:
 
         system_prompt = SKILL_REACT_PROMPT.format(
             skill_name=skill.name,
-            description=skill.description or "",
+            description=getattr(skill, "description", "") or "",
             skill_source_dir=skill.source_dir or "<none>",
             existing_scripts=self._list_existing_scripts(skill),
             skill_content=self._get_skill_content(skill),
@@ -1167,6 +1199,10 @@ class SkillAgent:
         """LLM 输入预算 = context_window - max_output_tokens（估算）。"""
         cw = getattr(self._llm, "context_window", 0) or 0
         mt = getattr(self._llm, "max_tokens", 0) or 0
+        if not isinstance(cw, (int, float)):
+            cw = 0
+        if not isinstance(mt, (int, float)):
+            mt = 0
         if cw <= 0:
             return 100_000
         return max(cw - mt, 8192)
@@ -1514,6 +1550,9 @@ class SkillAgent:
         stall 检测已不依赖此 signal（直接用文件系统快照对比），
         但 observation["task_signal"] 仍保留用于其他上下文（如 on_step callback）。
         """
+        normalized = (summary or "").strip().lower()
+        if normalized.startswith(("err:", "error:")) or "error occurred" in normalized:
+            return "none"
         if tool_name in {"file_create", "edit_file_by_lines", "bash"}:
             return "strong"
         if tool_name in {"search_web", "fetch_webpage", "read_file", "grep", "glob", "list_dir"}:

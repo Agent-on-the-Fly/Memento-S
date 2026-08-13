@@ -99,18 +99,28 @@ class SkillGateway:
     async def discover(self) -> list[SkillManifest]:
         """发现可用技能"""
 
-    async def recall(self, query: str, ...):
-        """检索相关技能"""
+    async def route(self, query: str, ...):
+        """用 keyword/Qwen/hybrid 路由本地技能"""
 
     async def execute(self, skill_name: str, ...):
         """执行技能"""
+
+    async def evolve_failure(self, ...):
+        """归因失败并以测试门禁更新一个技能"""
+
+    async def rollback_skill(self, skill_name: str):
+        """恢复最近的更新前快照"""
 ```
 
 **功能**:
 - 技能发现与注册
-- 技能检索 (本地/远程)
+- 技能检索 (本地关键词、Qwen embedding、hybrid fusion、远程)
 - 技能执行与治理
 - 技能下载管理
+- 失败后的单技能归因、隔离更新、自动测试与事务回滚
+
+Qwen router 与 Read-Write 更新的配置和门禁细节见
+[`QWEN_ROUTER_AND_SKILL_EVOLUTION.md`](QWEN_ROUTER_AND_SKILL_EVOLUTION.md)。
 
 ### 4.3 LLMClient (大模型客户端)
 

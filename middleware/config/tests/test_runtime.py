@@ -469,4 +469,4 @@ class TestPathsAndPermissions:
 
         manager = ConfigManager(str(config_path))
         # expanduser 后应指向实际 home 目录
-        assert str(manager.user_config_path).startswith("/Users/manson") or "~" in str(config_path)
+        assert manager.user_config_path == config_path.expanduser()

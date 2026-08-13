@@ -103,16 +103,24 @@ class ArtifactRegistry:
 
     def mark_verified(self, path: str) -> None:
         """标记文件已被 read_file 验证过。"""
-        if path in self._records:
-            self._records[path].verified = True
+        normalized = self._normalize_path(path)
+        if normalized in self._records:
+            self._records[normalized].verified = True
 
     def is_registered(self, path: str) -> bool:
         """检查文件是否已注册。"""
-        return path in self._records
+        return self._normalize_path(path) in self._records
 
     def get(self, path: str) -> ArtifactRecord | None:
         """获取文件记录。"""
-        return self._records.get(path)
+        return self._records.get(self._normalize_path(path))
+
+    @staticmethod
+    def _normalize_path(path: str) -> str:
+        try:
+            return str(Path(path).resolve())
+        except Exception:
+            return path
 
     # ── 查询 ──────────────────────────────────────────────────────────────
 

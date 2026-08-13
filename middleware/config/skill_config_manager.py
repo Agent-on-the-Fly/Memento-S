@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -36,8 +36,12 @@ class SkillConfigManager:
     _SCHEMA = "skill_config_schema.json"
     _USER_FILE = "skill.json"
 
-    def __init__(self) -> None:
-        self._user_path = PathManager.get_project_root_dir() / self._USER_FILE
+    def __init__(self, user_path: Path | None = None) -> None:
+        self._user_path = (
+            Path(user_path)
+            if user_path is not None
+            else PathManager.get_project_root_dir() / self._USER_FILE
+        )
         self._data: dict[str, Any] = {}
         self._loaded = False
         self._model: SkillRegistryConfig | None = None  # cached Pydantic model
@@ -127,7 +131,9 @@ class SkillConfigManager:
         """更新 last_sync 时间戳和 sync_errors"""
         self._ensure_loaded()
         self._data.setdefault("index", {})
-        self._data["index"]["last_sync"] = datetime.utcnow().isoformat() + "Z"
+        self._data["index"]["last_sync"] = (
+            datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        )
         self._data["index"]["sync_errors"] = errors if errors is not None else []
         self.save()
 

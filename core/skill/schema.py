@@ -107,7 +107,7 @@ class Skill(BaseModel):
 
     name: str = Field(..., description="技能名称，如 calculate_sum")
     description: str = Field(..., description="技能功能描述")
-    content: str = Field(..., description="SKILL.md 内容")
+    content: str = Field("", description="SKILL.md 内容")
     dependencies: list[str] = Field(default_factory=list, description="依赖包列表")
     version: int = Field(0, description="当前版本号")
     files: dict[str, str] = Field(default_factory=dict, description="技能文件")
@@ -132,7 +132,7 @@ class Skill(BaseModel):
         None,
         description="OpenAI/Anthropic 兼容的参数 schema。为 None 时由执行层推断",
     )
-    allowed_tools: list[str] = Field(
+    allowed_tools: Optional[list[str]] = Field(
         default_factory=list,
         description="此 skill 允许使用的工具列表（按 agentskills.io 规范，实验性功能）",
     )

@@ -7,6 +7,20 @@
 import pytest
 
 
+# These files are legacy, executable diagnostics for the pre-Conversation
+# storage/provider APIs.  They perform live/manual checks and are not part of
+# the current pytest contract.  Current equivalents live in the focused test
+# packages under tests/ and middleware/storage/tests/.
+collect_ignore = [
+    "test_model_schema_consistency.py",
+    "test_prompt_components.py",
+    "test_search_execute_flow.py",
+    "test_storage_models.py",
+    "test_storage_performance.py",
+    "test_storage_service.py",
+]
+
+
 def pytest_configure(config):
     """配置 pytest，注册自定义标记"""
     config.addinivalue_line(

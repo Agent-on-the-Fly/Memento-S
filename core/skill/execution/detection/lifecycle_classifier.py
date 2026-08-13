@@ -148,6 +148,16 @@ class FileLifecycleClassifier:
             tool_name, path, path.suffix.lower()
         )
 
+        # Python REPL runner files are implementation details, never user
+        # artifacts, even though they use an otherwise artifact-like .py suffix.
+        if path.name.startswith("__runner__"):
+            return LifecycleClassification(
+                lifecycle=FileLifecycle.TEMPORARY,
+                confidence=1.0,
+                reasons=["Internal REPL runner"],
+                overrides=["internal_runner"],
+            )
+
         # Rule 0: Artifact extension override (highest priority for artifacts)
         # Check BEFORE tool_source check to allow .md/.txt/.json to bypass TEMPORARY_TOOLS
         ext = path.suffix.lower()

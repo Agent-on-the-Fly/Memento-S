@@ -73,6 +73,12 @@ test = [
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=5.0.0",
 ]
+qwen-router = [
+    "accelerate>=1.0.0",
+    "numpy>=1.24.0",
+    "torch>=2.2.0",
+    "transformers>=4.51.0",
+]
 
 [project.urls]
 Homepage = "https://memento.run/"
@@ -208,6 +214,8 @@ include = [
 [tool.pytest.ini_options]
 minversion = "8.0"
 asyncio_mode = "strict"
+python_files = ["test_*.py"]
+norecursedirs = ["scripts"]
 markers = [
     "smoke: fast checks for core functionality",
     "slow: tests that invoke an LLM or process substantial data",

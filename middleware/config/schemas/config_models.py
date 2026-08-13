@@ -95,10 +95,21 @@ class RetrievalConfig(BaseModel):
 
     top_k: int = 5
     min_score: float = 0.012
+    router_backend: Literal["keyword", "qwen", "hybrid"] = "hybrid"
     embedding_model: str = "auto"
     embedding_dimension: int = 1536  # text-embedding-3-small 默认维度
     embedding_api_key: str | None = None
     embedding_base_url: str | None = None
+    qwen_tokenizer_path: str = "Qwen/Qwen3-Embedding-0.6B"
+    qwen_model_path: str = ""
+    qwen_device: str = "auto"
+    qwen_max_length: int = 8192
+    qwen_batch_size: int = 32
+    qwen_timeout_sec: float = 30.0
+    qwen_query_instruction: str = (
+        "Instruct: Given a user query, retrieve relevant skill descriptions "
+        "that match the query\nQuery:"
+    )
     reranker_enabled: bool = True
     reranker_min_score: float = 0.001
 
@@ -120,6 +131,32 @@ class ExecutionConfig(BaseModel):
     same_signature_limit: int = 2
 
 
+class SkillEvolutionConfig(BaseModel):
+    """Read-Write reflective learning configuration for skill mutation."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = True
+    protected_skills: list[str] = Field(
+        default_factory=lambda: [
+            "filesystem",
+            "skill-creator",
+            "uv-pip-install",
+            "web-search",
+        ]
+    )
+    min_attribution_confidence: float = 0.5
+    max_updates_per_step: int = 1
+    candidate_attempts: int = Field(default=1, ge=1, le=5)
+    utility_discovery_enabled: bool = True
+    utility_discovery_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
+    utility_min_samples: int = Field(default=3, ge=1)
+    test_timeout_sec: int = 180
+    synthetic_test_enabled: bool = True
+    keep_failed_candidate: bool = True
+    max_prompt_chars: int = 60000
+
+
 class SkillsConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -127,6 +164,7 @@ class SkillsConfig(BaseModel):
     cloud_catalog_url: str | None = None
     retrieval: RetrievalConfig
     execution: ExecutionConfig
+    evolution: SkillEvolutionConfig = Field(default_factory=SkillEvolutionConfig)
 
 
 class PathsConfig(BaseModel):
@@ -325,6 +363,10 @@ class GlobalConfig(BaseModel):
             "app": model_to_user_dict(self.app),
             "llm": _model_to_dict(self.llm),
             "env": self.env or {},
+            "skills": {
+                "retrieval": model_to_user_dict(self.skills.retrieval),
+                "evolution": model_to_user_dict(self.skills.evolution),
+            },
             "im": _model_to_dict(self.im),
             "gateway": model_to_user_dict(self.gateway),
             "ota": model_to_user_dict(self.ota),
@@ -337,6 +379,7 @@ __all__ = [
     "LLMProfile",
     "LLMConfig",
     "RetrievalConfig",
+    "SkillEvolutionConfig",
     "ExecutionConfig",
     "SkillsConfig",
     "PathsConfig",

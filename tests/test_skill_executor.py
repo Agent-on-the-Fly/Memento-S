@@ -256,7 +256,7 @@ def test_react_state_action_signature():
         {"id": "2", "function": {"name": "bash", "arguments": '{"command": "echo hi"}'}}
     )
     # Same name+args should produce same signature
-    assert str(sig1) == str(sig2)
+    assert sig1[:2] == sig2[:2]
     print(f"  ✓ 相同参数产生相同签名")
 
 

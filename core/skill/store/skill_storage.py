@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import ast
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Set
 
@@ -309,7 +309,7 @@ Add any important notes, edge cases, or limitations here.
             "location": str((self._skills_dir / storage_name).resolve()),
             "source": "local",
             "version": skill.version or 1,
-            "installed_at": datetime.utcnow().isoformat() + "Z",
+            "installed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "status": "active",
             "tags": [],
         })
@@ -367,7 +367,7 @@ Add any important notes, edge cases, or limitations here.
                         "location": str(skill_dir.resolve()),
                         "source": "local",
                         "version": skill.version or 1,
-                        "installed_at": datetime.utcnow().isoformat() + "Z",
+                        "installed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                         "status": "active",
                         "tags": [],
                     })

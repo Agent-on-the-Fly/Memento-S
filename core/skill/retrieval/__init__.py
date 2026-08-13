@@ -4,6 +4,7 @@
 from .base import BaseRecall
 from .local_recall import LocalRecall
 from .multi_recall import MultiRecall
+from .qwen_recall import QwenRecall
 from .remote_recall import RemoteRecall
 from shared.schema import SkillSearchResult
 
@@ -11,6 +12,7 @@ __all__ = [
     "BaseRecall",
     "LocalRecall",
     "MultiRecall",
+    "QwenRecall",
     "RemoteRecall",
     "SkillSearchResult",
 ]

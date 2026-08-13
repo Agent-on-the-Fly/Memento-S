@@ -12,25 +12,40 @@ from pathlib import Path
 
 from shared.schema import SkillConfig
 from core.skill.market import SkillMarket
-from middleware.config import ConfigManager, g_config
+from middleware.config import ConfigManager
+from middleware.config.skill_config_manager import SkillConfigManager
+from core.skill.registry import SkillRegistry
+from core.skill.store import SkillStorage
+from core.skill.retrieval import RemoteRecall
 
 
-@pytest.fixture(scope="session")
-def test_config():
-    """加载测试配置"""
-    if not g_config._config:
-        config_manager = ConfigManager()
-        config_manager.load()
-        g_config._config = config_manager._config
-    return SkillConfig.from_global_config()
+@pytest.fixture
+def test_config(tmp_path):
+    """Build an isolated config so uninstall never touches user skills."""
+    manager = ConfigManager()
+    runtime = manager.load()
+    return SkillConfig(
+        skills_dir=tmp_path / "skills",
+        builtin_skills_dir=tmp_path / "builtin-skills",
+        workspace_dir=tmp_path / "workspace",
+        cloud_catalog_url=runtime.skills.cloud_catalog_url,
+    )
 
 
 @pytest_asyncio.fixture
 async def skill_market(test_config):
     """创建 SkillMarket 实例"""
-    market = await SkillMarket.from_config(test_config)
+    registry_manager = SkillConfigManager(
+        user_path=test_config.workspace_dir / "skill.json"
+    )
+    store = SkillStorage(test_config.skills_dir, SkillRegistry(registry_manager))
+    await store.init()
+    remote = await RemoteRecall.from_config(test_config)
+    market = SkillMarket(config=test_config, store=store, remote_recall=remote)
     yield market
     await market._store.close()
+    if remote is not None:
+        await remote.close()
 
 
 @pytest.mark.integration

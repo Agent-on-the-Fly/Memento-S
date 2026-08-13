@@ -183,7 +183,7 @@ def stamp_version(revision: str, db_url: str | None = None) -> None:
     print(f"✓ 已标记为版本 {revision}")
 
 
-def test_migration_workflow() -> None:
+def test_migration_workflow(tmp_path) -> None:
     """测试完整的迁移流程。"""
     print("=" * 70)
     print("测试数据库迁移工作流")
@@ -191,8 +191,7 @@ def test_migration_workflow() -> None:
 
     setup_logger()
 
-    manager = ConfigManager()
-    db_url = manager.get_db_url()
+    db_url = f"sqlite+aiosqlite:///{tmp_path / 'migration-test.db'}"
 
     print(f"\n数据库 URL: {db_url}")
 

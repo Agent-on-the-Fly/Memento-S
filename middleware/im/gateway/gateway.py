@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 import websockets
-from websockets.server import WebSocketServerProtocol
 
 from .protocol import (
     AccountConfig,
@@ -781,7 +780,7 @@ class Gateway:
 
     async def _handle_websocket(
         self,
-        websocket: WebSocketServerProtocol,
+        websocket: Any,
     ) -> None:
         """处理 WebSocket 连接。"""
         connection_id = ""

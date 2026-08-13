@@ -198,6 +198,16 @@ class FileChangeHook(HookDefinition):
         """获取 ExecutionFileTracker 实例。"""
         return self._tracker
 
+    @property
+    def _execution_stack(self) -> list:
+        """Compatibility view of the tracker's execution stack."""
+        return self._tracker._execution_stack if self._tracker is not None else []
+
+    @_execution_stack.setter
+    def _execution_stack(self, value: list) -> None:
+        if self._tracker is not None:
+            self._tracker._execution_stack = value
+
     def bind_artifact_registry(self, registry: Any) -> None:
         """
         绑定 ArtifactRegistry（保留接口签名，向后兼容）。

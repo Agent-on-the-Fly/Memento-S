@@ -20,8 +20,8 @@ async def test_skill_install_missing_name_real_gateway(real_dispatcher: SkillDis
 
 @pytest.mark.asyncio
 async def test_unknown_tool_raises_real_gateway(real_dispatcher: SkillDispatcher):
-    with pytest.raises(ValueError, match="Unknown tool"):
-        await real_dispatcher.execute("totally_unknown_tool", {})
+    payload = json.loads(await real_dispatcher.execute("totally_unknown_tool", {}))
+    assert payload["error_code"] == "UNKNOWN_TOOL"
 
 
 @pytest.mark.asyncio

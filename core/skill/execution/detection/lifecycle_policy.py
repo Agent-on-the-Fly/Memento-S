@@ -14,7 +14,10 @@ from pathlib import Path
 
 from core.skill.execution.detection.config import LifecyclePolicy
 from shared.fs.types import ChangeType
-from core.skill.execution.detection.lifecycle_classifier import LifecycleClassification
+from core.skill.execution.detection.lifecycle_classifier import (
+    FileLifecycleClassifier,
+    LifecycleClassification,
+)
 from core.skill.execution.detection.types import FileLifecycle
 from utils.logger import get_logger
 
@@ -77,6 +80,7 @@ class LifecyclePolicyEngine:
 
     def __init__(self, policy: LifecyclePolicy | None = None):
         self.policy = policy or LifecyclePolicy()
+        self._classifier = FileLifecycleClassifier()
 
     def decide(
         self,
@@ -94,8 +98,10 @@ class LifecyclePolicyEngine:
         Returns:
             LifecycleDecision for this file.
         """
-        lifecycle = change.lifecycle
-        if classification:
+        lifecycle = getattr(change, "lifecycle", None)
+        if classification is None and lifecycle is None:
+            classification = self._classifier.classify(change.path, "")
+        if classification is not None:
             lifecycle = classification.lifecycle
 
         # [ANALYSIS-LOG] Always log at INFO
@@ -169,11 +175,15 @@ class LifecyclePolicyEngine:
             classification = None
             if classifications and i < len(classifications):
                 classification = classifications[i]
+            if classification is None:
+                classification = self._classifier.classify(
+                    change.path,
+                    getattr(change_set, "tool_name", ""),
+                    change_type=change.change_type,
+                )
 
             decision = self.decide(change, classification, artifacts_set)
-            lifecycle = change.lifecycle
-            if classification:
-                lifecycle = classification.lifecycle
+            lifecycle = classification.lifecycle
 
             result = PolicyResult(
                 path=change.path,

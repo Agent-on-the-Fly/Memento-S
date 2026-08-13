@@ -385,7 +385,6 @@ async def test_execute_skill_direct_local():
     print("\n【9. execute_skill 直接调用本地 skill（无需先 search）】")
 
     from core.memento_s.skill_dispatch import SkillDispatcher
-from core.context.session_context import SessionContext
 
     skills = _make_fake_skills()
     provider = _build_provider(skills)
@@ -419,7 +418,6 @@ async def test_execute_skill_cloud_requires_search():
     print("\n【10. execute_skill 未知 skill 仍要求先 search】")
 
     from core.memento_s.skill_dispatch import SkillDispatcher
-from core.context.session_context import SessionContext
 
     skills = _make_fake_skills()
     provider = _build_provider(skills)
@@ -450,7 +448,6 @@ async def test_end_to_end_messages():
     print("\n【11. 端到端：优化后完整 messages 验证】")
 
     from core.memento_s.skill_dispatch import SkillDispatcher
-from core.context.session_context import SessionContext
 
     real_skills = _load_real_builtin_skills()
     if real_skills is None:

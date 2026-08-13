@@ -35,9 +35,9 @@ def skill_config(test_config):
 
 
 @pytest.fixture(scope="session")
-def skills_dir(skill_config):
-    """从 g_config 获取 skills 目录"""
-    return Path(skill_config.skills_dir)
+def skills_dir(tmp_path_factory):
+    """Use an isolated skills directory for storage mutation tests."""
+    return tmp_path_factory.mktemp("skill-storage") / "skills"
 
 
 @pytest_asyncio.fixture
@@ -45,9 +45,11 @@ async def skill_storage(skills_dir):
     """SkillStorage 实例 - 使用真实路径"""
     from core.skill.store import SkillStorage
     from core.skill.registry import SkillRegistry
+    from middleware.config.skill_config_manager import SkillConfigManager
 
     skills_dir.mkdir(parents=True, exist_ok=True)
-    store = SkillStorage(skills_dir, SkillRegistry())
+    manager = SkillConfigManager(user_path=skills_dir.parent / "skill.json")
+    store = SkillStorage(skills_dir, SkillRegistry(manager))
     await store.init()
     yield store
     await store.close()

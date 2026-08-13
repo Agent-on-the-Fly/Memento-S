@@ -106,6 +106,18 @@ def _track_execute_result(state: AgentRunState, sc: ToolCall, result: str) -> No
     skill_name = sc.arguments.get("skill_name", "")
     try:
         payload = json.loads(result)
+        state.skill_execution_trace.append(
+            {
+                "skill_name": skill_name,
+                "request": str(sc.arguments.get("request", ""))[:4000],
+                "ok": bool(payload.get("ok", False)),
+                "status": payload.get("status"),
+                "summary": str(payload.get("summary", ""))[:4000],
+                "output": str(payload.get("output", ""))[:4000],
+                "error_code": payload.get("error_code"),
+                "diagnostics": payload.get("diagnostics"),
+            }
+        )
         summary = str(payload.get("summary", ""))
         output_text = str(payload.get("output", ""))
         if "[NOT_RELEVANT]" in summary or "[NOT_RELEVANT]" in output_text:
@@ -119,6 +131,15 @@ def _track_execute_result(state: AgentRunState, sc: ToolCall, result: str) -> No
             state.execute_failures = 0
             state.skill_failure_tracker.pop(skill_name, None)
     except Exception:
+        state.skill_execution_trace.append(
+            {
+                "skill_name": skill_name,
+                "request": str(sc.arguments.get("request", ""))[:4000],
+                "ok": False,
+                "status": "parse_error",
+                "summary": result[:4000],
+            }
+        )
         state.execute_failures += 1
         state.last_execute_error = result[:200]
         state.skill_failure_tracker.setdefault(skill_name, []).append("PARSE_ERROR")

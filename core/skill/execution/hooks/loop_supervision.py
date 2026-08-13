@@ -119,6 +119,9 @@ class LoopSupervisionHook(HookDefinition):
 
         _abort_signal: dict[str, Any] | None = None
         if (
+            args
+            and not _hook_has_effect
+            and
             self._repeated_action_count >= self._repeated_action_threshold - 1
             and self._last_result_hash is not None
             and result_hash is not None
@@ -160,6 +163,12 @@ class LoopSupervisionHook(HookDefinition):
 
         # ── 3. LoopDetector detect ──────────────────────────────────
         _loop_info = self._loop_detector.detect()
+        if _loop_info and _loop_info.get("type") == "observation_chain":
+            sequence_info = self._loop_detector._check_repeating_sequence()
+            sequence = (sequence_info or {}).get("sequence", [])
+            web_tools = {"search_web", "fetch_webpage"}
+            if sequence_info and not set(sequence).issubset(web_tools):
+                _loop_info = sequence_info
 
         # ── 4. 构建 deferred_messages ────────────────────────────────
         deferred_messages: list[dict[str, Any]] = []
@@ -295,12 +304,19 @@ class LoopSupervisionHook(HookDefinition):
             except Exception:
                 pass
 
+    _UNSET = object()
+
     def _decide_recovery_action(
         self,
         abort_signal: dict[str, Any] | None,
-        loop_info: dict[str, Any] | None,
+        loop_info: dict[str, Any] | None | object = _UNSET,
     ) -> str | None:
         """根据检测结果决定恢复动作。优先级：abort_signal > loop_info"""
+        # Legacy callers passed only loop_info. Keep that public helper shape
+        # while supporting the newer explicit abort signal.
+        if loop_info is self._UNSET:
+            loop_info = abort_signal
+            abort_signal = None
         # 最高优先：result-aware repeated action
         if abort_signal:
             return RECOMMEND_ABORT
@@ -324,7 +340,6 @@ class LoopSupervisionHook(HookDefinition):
             "repeating_sequence",
             "no_progress",
             "stall",
-            "observation_chain",
             "low_effect_ratio",
             "diminishing_returns",
         }:

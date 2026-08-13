@@ -25,7 +25,8 @@ class TestDreamDaemon:
 
         def counting_create_task(coro):
             task_count["value"] += 1
-            return coro
+            coro.close()
+            return object()
 
         monkeypatch.setattr("asyncio.create_task", counting_create_task)
 

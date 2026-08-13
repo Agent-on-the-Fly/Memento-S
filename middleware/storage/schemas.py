@@ -55,7 +55,7 @@ class ConversationCreate(BaseModel):
 
     id: str | None = None  # 如果为None，自动生成 UUID
     session_id: str
-    conversation_id: str  # 对话轮次ID
+    conversation_id: str | None = None  # 对话轮次ID；为空时与记录 ID 一致
     role: str  # user/assistant/system
     title: str
     content: str

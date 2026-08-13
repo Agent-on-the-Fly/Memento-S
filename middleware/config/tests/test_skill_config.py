@@ -21,7 +21,7 @@ import pytest
 import tempfile
 import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from middleware.config.skill_config_manager import SkillConfigManager
 
@@ -80,7 +80,7 @@ class TestSkillCRUD:
                 "location": "/tmp/test-skills/test-skill",
                 "source": "builtin",
                 "version": 1,
-                "installed_at": datetime.utcnow().isoformat() + "Z",
+                "installed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "status": "active",
                 "tags": ["test"],
             },
@@ -196,7 +196,7 @@ class TestSkillPydanticModel:
             "location": "/tmp/cloud/pydantic-test",
             "source": "cloud",
             "version": 3,
-            "installed_at": datetime.utcnow().isoformat() + "Z",
+            "installed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "status": "disabled",
             "tags": ["ai", "test"],
         })
@@ -431,7 +431,7 @@ class TestSkillEdgeCases:
                 }
             },
             "index": {
-                "last_sync": datetime.utcnow().isoformat() + "Z",
+                "last_sync": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "sync_errors": [],
             },
         }

@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import re
-from datetime import datetime
+import shutil
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +41,16 @@ from .schema import DEFAULT_SKILL_PARAMS, DiscoverStrategy, Skill
 logger = get_logger(__name__)
 
 
+@dataclass(frozen=True)
+class SkillPreflightResult:
+    """Backward-compatible result for callers that preflight separately."""
+
+    ready: bool
+    status: SkillStatus
+    message: str = ""
+    error_code: SkillErrorCode | None = None
+
+
 class SkillGateway:
     """Skill 契约实现：目录层、运行时层、治理层。
 
@@ -60,6 +72,7 @@ class SkillGateway:
         self._agent = agent
         self._llm = llm
         self._download_locks: dict[str, asyncio.Lock] = {}
+        self._evolution_engine = None
 
     @classmethod
     async def from_config(
@@ -161,6 +174,70 @@ class SkillGateway:
         except Exception as e:
             logger.warning("Skill search failed for query '{}': {}", query, e)
             return []
+
+    async def route(self, query: str, k: int | None = None) -> list[SkillManifest]:
+        """Route a goal to a compact local skill set for planning.
+
+        This is the paper's Read phase.  MultiRecall may use keyword, Qwen, or
+        their score-aware fusion; cloud entries are excluded because a plan can
+        only directly execute installed skills.
+        """
+        if self._multi_recall is None:
+            return []
+        route_k = max(1, int(k or self._config.retrieval_top_k))
+        try:
+            candidates = await self._multi_recall.search(
+                query,
+                k=route_k,
+                per_recall_k=max(route_k * 3, route_k),
+                source_filter="local",
+            )
+            return [self._candidate_to_manifest(c) for c in candidates]
+        except Exception as exc:
+            logger.warning("Skill route failed for query '{}': {}", query, exc)
+            return []
+
+    async def get_manifest(self, skill_name: str) -> SkillManifest | None:
+        """Return metadata for one installed skill."""
+        skill = await self._store.get_skill(skill_name)
+        return self._to_manifest(skill) if skill is not None else None
+
+    async def read(self, skill_name: str) -> str | None:
+        """Read the full SKILL.md content for one installed skill."""
+        skill = await self._store.get_skill(skill_name)
+        if skill is None:
+            return None
+        if skill.source_dir:
+            skill_md = Path(skill.source_dir) / "SKILL.md"
+            if skill_md.is_file():
+                return skill_md.read_text(encoding="utf-8")
+        return skill.content
+
+    async def preflight(
+        self, skill_name: str, params: dict[str, Any] | None = None
+    ) -> SkillPreflightResult:
+        """Validate that an installed skill can start without executing it."""
+        skill = await self._store.get_skill(skill_name)
+        if skill is None:
+            return SkillPreflightResult(
+                ready=False,
+                status=SkillStatus.FAILED,
+                message=f"Skill '{skill_name}' not found",
+                error_code=SkillErrorCode.SKILL_NOT_FOUND,
+            )
+        result = run_pre_execute_gate(skill, params=params or {})
+        if not result.allowed:
+            return SkillPreflightResult(
+                ready=False,
+                status=SkillStatus.BLOCKED,
+                message=result.reason,
+                error_code=SkillErrorCode.POLICY_DENIED,
+            )
+        return SkillPreflightResult(
+            ready=True,
+            status=SkillStatus.SUCCESS,
+            message="ready",
+        )
 
     # ── Runtime ──────────────────────────────────────────────────────────
 
@@ -350,6 +427,80 @@ class SkillGateway:
         """Download and install a cloud skill to local storage."""
         return await self._ensure_local_skill(skill_name)
 
+    # ── Read-Write reflective evolution ─────────────────────────────────
+
+    def _get_evolution_engine(self):
+        if self._evolution_engine is None:
+            from .evolution import SkillEvolutionEngine
+
+            if self._llm is None:
+                self._llm = LLMClient()
+            self._evolution_engine = SkillEvolutionEngine(
+                config=self._config,
+                llm=self._llm,
+                candidate_runner=self._run_evolution_candidate,
+            )
+        return self._evolution_engine
+
+    async def record_skill_outcome(self, skill_name: str, success: bool) -> dict[str, Any]:
+        """Update the empirical utility table for an executed skill."""
+        try:
+            return await self._get_evolution_engine().record_outcome(skill_name, success)
+        except Exception as exc:
+            logger.warning("Failed to record utility for '{}': {}", skill_name, exc)
+            return {}
+
+    async def evolve_failure(
+        self,
+        *,
+        task: str,
+        used_skills: list[str],
+        trace: list[dict[str, Any]],
+        rationale: str,
+        session_id: str = "",
+    ):
+        """Run automatic attribution, rewrite, tests, and guarded deployment."""
+        return await self._get_evolution_engine().evolve_failure(
+            task=task,
+            used_skills=used_skills,
+            trace=trace,
+            rationale=rationale,
+            session_id=session_id,
+        )
+
+    async def rollback_skill(self, skill_name: str):
+        """Restore the most recent successful pre-evolution snapshot."""
+        return await self._get_evolution_engine().rollback_last(skill_name)
+
+    async def _run_evolution_candidate(
+        self, skill: Skill, request: str
+    ) -> dict[str, Any]:
+        """Execute an isolated candidate through the normal SkillAgent runtime."""
+        if self._agent is None:
+            self._agent = SkillAgent(config=self._config, llm=self._llm)
+        test_root = self._config.workspace_dir / ".evolution-tests"
+        test_root.mkdir(parents=True, exist_ok=True)
+        run_dir = Path(tempfile.mkdtemp(prefix="candidate-", dir=test_root))
+        try:
+            outcome, _generated_code = await self._agent.run(
+                skill,
+                query=request,
+                params={"request": request},
+                run_dir=run_dir,
+                session_id="skill-evolution-test",
+                on_step=None,
+            )
+            return {
+                "success": outcome.success,
+                "result": outcome.result,
+                "error": outcome.error,
+                "error_type": outcome.error_type.value if outcome.error_type else None,
+                "artifacts": outcome.artifacts,
+                "operation_results": outcome.operation_results,
+            }
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
     # ── Internal ────────────────────────────────────────────────────────
 
     @staticmethod
@@ -361,8 +512,8 @@ class SkillGateway:
         return sanitized[:128] or "default"
 
     def _build_run_dir(self, session_id: str | None) -> Path:
-        from datetime import datetime
         import hashlib
+        from datetime import datetime
 
         date_str = datetime.now().strftime("%Y-%m-%d")
         raw_id = (session_id or "").strip()

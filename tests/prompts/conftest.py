@@ -22,10 +22,8 @@ def _load_config():
 
 
 @pytest.fixture(scope="session")
-def _sandbox_temp_base():
-    base = os.path.join(_ROOT, ".pytest_temp")
-    os.makedirs(base, exist_ok=True)
-    return base
+def _sandbox_temp_base(tmp_path_factory):
+    return str(tmp_path_factory.mktemp("memento-prompts"))
 
 
 @pytest.fixture

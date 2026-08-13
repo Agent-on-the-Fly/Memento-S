@@ -69,6 +69,10 @@ class AgentRunState:
     # Per-skill failure tracking: skill_name → list of recent error types
     skill_failure_tracker: dict[str, list[str]] = field(default_factory=dict)
 
+    # Full per-run skill trace used for post-hoc failure attribution.
+    skill_execution_trace: list[dict[str, Any]] = field(default_factory=list)
+    evolution_attempts_by_step: dict[str, int] = field(default_factory=dict)
+
     # Duplicate tool call detection
     _last_tool_sig: str = field(default="", repr=False)
     _dup_count: int = field(default=0, repr=False)
@@ -170,9 +174,12 @@ class AgentRunState:
             "explicit_skill_retry_done": self.explicit_skill_retry_done,
             "execute_failures": self.execute_failures,
             "last_execute_error": self.last_execute_error,
+            "skill_failure_tracker": self.skill_failure_tracker,
             "plan_step_statuses": [s.value for s in self.plan_step_statuses],
             "pending_ask_user_call_id": self.pending_ask_user_call_id,
             "reflection_history": self.reflection_history,
+            "skill_execution_trace": self.skill_execution_trace,
+            "evolution_attempts_by_step": self.evolution_attempts_by_step,
             "messages": self.messages,
         }
         if self.task_plan:
@@ -193,11 +200,14 @@ class AgentRunState:
         state.explicit_skill_retry_done = data.get("explicit_skill_retry_done", False)
         state.execute_failures = data.get("execute_failures", 0)
         state.last_execute_error = data.get("last_execute_error", "")
+        state.skill_failure_tracker = data.get("skill_failure_tracker", {})
         state.plan_step_statuses = [
             PlanStepStatus(s) for s in data.get("plan_step_statuses", [])
         ]
         state.pending_ask_user_call_id = data.get("pending_ask_user_call_id")
         state.reflection_history = data.get("reflection_history", [])
+        state.skill_execution_trace = data.get("skill_execution_trace", [])
+        state.evolution_attempts_by_step = data.get("evolution_attempts_by_step", {})
         state.messages = data.get("messages", [])
         plan_data = data.get("task_plan")
         if plan_data:

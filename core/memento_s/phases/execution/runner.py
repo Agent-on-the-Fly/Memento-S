@@ -46,6 +46,56 @@ from .tool_handler import (
 logger = get_logger(__name__)
 
 
+async def _maybe_evolve_failed_skill(
+    *,
+    state: AgentRunState,
+    tool_dispatcher: SkillDispatcher,
+    reason: str,
+    ctx: ContextManager | None,
+) -> dict[str, Any] | None:
+    """Run at most one guarded skill mutation per failed plan step."""
+    current = state.current_plan_step()
+    if current is None:
+        return None
+    if not state.skill_execution_trace or not state.skill_failure_tracker:
+        return None
+
+    step_key = f"{state.replan_count}:{current.step_id}"
+    attempts = state.evolution_attempts_by_step.get(step_key, 0)
+    if attempts >= tool_dispatcher.max_evolution_updates_per_step:
+        return None
+
+    state.evolution_attempts_by_step[step_key] = attempts + 1
+    try:
+        result = await tool_dispatcher.evolve_after_failure(
+            task=state.task_plan.goal if state.task_plan else current.action,
+            trace=state.skill_execution_trace,
+            rationale=reason or state.last_execute_error,
+        )
+    except Exception as exc:
+        logger.opt(exception=True).warning("Automatic skill evolution failed: {}", exc)
+        return None
+
+    status = str(result.get("status", "unknown"))
+    skill_name = str(result.get("skill_name", ""))
+    logger.info(
+        "[SKILL_EVOLUTION] step={}, skill={}, status={}, error={}",
+        current.step_id,
+        skill_name,
+        status,
+        str(result.get("error", ""))[:300],
+    )
+    evolution_msg = {
+        "role": "system",
+        "content": (
+            f"[Skill evolution] status={status}; skill={skill_name or 'none'}; "
+            f"summary={result.get('summary', '')}; error={result.get('error', '')}"
+        ),
+    }
+    state.messages = await _append_messages(ctx, state.messages, [evolution_msg])
+    return result
+
+
 def _build_input_summary(state: AgentRunState, current_ps: PlanStep) -> str:
     """Build a summary of outputs from steps referenced by ``input_from``."""
     if not hasattr(current_ps, "input_from") or not current_ps.input_from:
@@ -123,9 +173,25 @@ async def run_plan_execution(
         # Fresh skill catalog — fetched at step start so newly downloaded skills are visible
         _step_skill_catalog = ""
         try:
-            _manifests = await tool_dispatcher._gateway.discover()
+            _route_query = current_ps.skill_request or current_ps.action
+            _manifests = await tool_dispatcher._gateway.route(_route_query)
+            if current_ps.skill_name and not any(
+                m.name == current_ps.skill_name for m in _manifests
+            ):
+                _all_manifests = await tool_dispatcher._gateway.discover()
+                _planned = next(
+                    (m for m in _all_manifests if m.name == current_ps.skill_name),
+                    None,
+                )
+                if _planned is not None:
+                    _manifests.append(_planned)
+            if not _manifests:
+                _manifests = await tool_dispatcher._gateway.discover()
             if _manifests:
-                _lines = [f"- **{m.name}**: {m.description or 'no description'}" for m in _manifests]
+                _lines = [
+                    f"- **{m.name}**: {m.description or 'no description'}"
+                    for m in _manifests
+                ]
                 _step_skill_catalog = "\n\n## Available Local Skills\n" + "\n".join(_lines)
         except Exception:
             pass
@@ -388,6 +454,12 @@ async def run_plan_execution(
                     )
 
             if abort_requested:
+                await _maybe_evolve_failed_skill(
+                    state=state,
+                    tool_dispatcher=tool_dispatcher,
+                    reason=state.last_execute_error or "skill execution aborted by error policy",
+                    ctx=ctx,
+                )
                 if pending_messages:
                     state.messages = await _append_messages(ctx, state.messages, pending_messages)
                 yield emitter.run_finished(
@@ -421,6 +493,12 @@ async def run_plan_execution(
                         logger.opt(exception=True).warning("SM LLM update failed in react loop")
 
             if state.should_stop_for_failures():
+                await _maybe_evolve_failed_skill(
+                    state=state,
+                    tool_dispatcher=tool_dispatcher,
+                    reason=state.last_execute_error or "consecutive skill failures exceeded",
+                    ctx=ctx,
+                )
                 yield emitter.step_finished(step=iteration, status=StepStatus.FINALIZE)
                 fail_text = EXEC_FAILURES_EXCEEDED_MSG.format(
                     last_error=state.last_execute_error
@@ -477,6 +555,14 @@ async def run_plan_execution(
             reflection.completed_step_id,
             str(reflection.next_step_hint)[:80] if reflection.next_step_hint else "",
         )
+
+        if reflection.decision == ReflectionDecision.REPLAN:
+            await _maybe_evolve_failed_skill(
+                state=state,
+                tool_dispatcher=tool_dispatcher,
+                reason=reflection.reason,
+                ctx=ctx,
+            )
 
         if reflection.decision == ReflectionDecision.IN_PROGRESS:
             logger.info("Reflection: in_progress — stay on current step")

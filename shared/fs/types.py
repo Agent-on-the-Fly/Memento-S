@@ -52,6 +52,7 @@ DEFAULT_IGNORE_DIRS: frozenset[str] = frozenset({
 
 # 统一忽略文件模式
 DEFAULT_IGNORE_PATTERNS: frozenset[str] = frozenset({
+    ".*",
     "*.pyc",
     "*.pyo",
     "*.pyd",

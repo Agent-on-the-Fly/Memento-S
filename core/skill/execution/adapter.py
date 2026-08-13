@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from tools import get_registry
+
 from shared.schema import SkillConfig
 from shared.hooks import HookExecutor
 from shared.hooks.types import HookEvent, HookPayload
@@ -88,8 +90,6 @@ class SkillToolAdapter:
         Returns:
             Tuple of (observation string, error dict or None).
         """
-        from tools import get_registry
-
         registry = get_registry()
 
         logger.debug(
@@ -283,7 +283,7 @@ class SkillToolAdapter:
         # （避免双重执行导致 FileChangeHook 等状态性 hook 的 before/after 配对错乱）
         classified = decision.classified_error
         retry_err: dict[str, Any] | None = None
-        if classified is not None:
+        if isinstance(classified, tuple) and len(classified) == 2:
             error_type, error_detail = classified
             if error_detail.get("retryable", False):
                 logger.info(
@@ -351,8 +351,6 @@ class SkillToolAdapter:
         Mirrors ToolRunner.run() from the deprecated tool_bridge/ module.
         For python_repl tool, env_vars are made available via os.environ.
         """
-        from tools import get_registry
-
         registry = get_registry()
 
         if not env_vars:

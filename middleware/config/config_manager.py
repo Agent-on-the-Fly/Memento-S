@@ -83,6 +83,15 @@ class ConfigManager:
         """检查配置是否已加载。"""
         return self._runtime_config is not None
 
+    @property
+    def _config(self) -> GlobalConfig | None:
+        """Backward-compatible alias for the pre-v0.4 runtime config field."""
+        return self._runtime_config
+
+    @_config.setter
+    def _config(self, value: GlobalConfig | None) -> None:
+        self._runtime_config = value
+
     def get_db_url(self) -> str:
         """返回数据库连接 URL。"""
         return f"sqlite+aiosqlite:///{self.paths.db_dir / 'memento_s.db'}"

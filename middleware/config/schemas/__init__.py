@@ -21,6 +21,7 @@ from .config_models import (
     OTAConfig,
     PathsConfig,
     RetrievalConfig,
+    SkillEvolutionConfig,
     SkillsConfig,
     WechatConfig,
     WecomConfig,
@@ -56,6 +57,7 @@ __all__ = [
     "OTAConfig",
     "PathsConfig",
     "RetrievalConfig",
+    "SkillEvolutionConfig",
     "SkillsConfig",
     "WechatConfig",
     "WecomConfig",
@@ -71,4 +73,3 @@ __all__ = [
     "SkillIndex",
     "SkillRegistryConfig",
 ]
-

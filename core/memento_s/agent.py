@@ -467,7 +467,9 @@ class MementoSAgent:
 
             log_agent_phase("PLAN_START", session_id, f"goal={intent.task[:60]}")
 
-            manifests = await self._gateway.discover() if self._gateway else []
+            manifests = await self._gateway.route(intent.task) if self._gateway else []
+            if not manifests and self._gateway:
+                manifests = await self._gateway.discover()
             skill_briefs = [
                 SkillBrief(
                     name=m.name,

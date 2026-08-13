@@ -6,6 +6,8 @@
 # Codex / agent runtime
 .agent/
 runs/
+.router-cache/
+.evolution/
 
 # GAIA dataset / attachments (large)
 GAIA_data/

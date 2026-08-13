@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 
 from core.context import ContextManager
 
@@ -13,7 +14,9 @@ def test_persist_tool_result_returns_inline(context_manager: ContextManager):
         "results": [{"tool": "list_dir", "args": {"path": "/src"}, "result": "file1.py"}],
     })
 
-    msg = context_manager.persist_tool_result("call-1", "filesystem", result)
+    msg = asyncio.run(
+        context_manager.persist_tool_result("call-1", "filesystem", result)
+    )
 
     assert msg["role"] == "tool"
     assert msg["tool_call_id"] == "call-1"

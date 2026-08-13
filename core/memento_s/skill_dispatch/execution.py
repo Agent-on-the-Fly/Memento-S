@@ -89,6 +89,7 @@ class SkillExecutionHandler:
             session_id=self._session_id,
             on_step=self._on_step,
         )
+        await self._gateway.record_skill_outcome(skill_name, envelope.ok)
 
         logger.debug(
             f"[SkillExecutionHandler.execute_skill] gateway.execute RETURNED: "

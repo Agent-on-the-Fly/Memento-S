@@ -55,28 +55,25 @@ class SkillSearchHandler:
         local_skills = [m for m in all_skills if m.governance.source == "local"]
         cloud_skills = [m for m in all_skills if m.governance.source == "cloud"]
 
-        output_lines: list[str] = []
+        output = [
+            {
+                "name": skill.name,
+                "description": skill.description,
+                "source": skill.governance.source,
+                "execution_mode": skill.execution_mode.value,
+            }
+            for skill in cloud_skills
+        ]
 
-        for skill in local_skills:
-            output_lines.append(
-                f"Found [Local] skill: `{skill.name}`. Status: Installed. "
-                f"You can `execute_skill(skill_name='{skill.name}', request='...')` directly."
-            )
-
-        for skill in cloud_skills:
-            output_lines.append(
-                f"Found [Remote] skill: `{skill.name}`. Status: Not Installed. "
-                f"You MUST call `download_skill(skill_name='{skill.name}')` before executing."
-            )
-
-        if not output_lines:
+        if not all_skills:
             return json.dumps(
                 {
                     "ok": True,
                     "status": "success",
                     "summary": f"No skills found for '{query}'.",
-                    "output": "No skills found locally or remotely. You are authorized to use `create_skill` immediately.",
-                    "diagnostics": {"query": query, "results_count": 0},
+                    "output": [],
+                    "metrics": {"k": k, "cloud_count": 0},
+                    "diagnostics": {"query": query, "local_in_context": 0},
                 },
                 ensure_ascii=False,
                 default=str,
@@ -85,13 +82,15 @@ class SkillSearchHandler:
         payload: dict[str, Any] = {
             "ok": True,
             "status": "success",
-            "summary": f"Found {len(all_skills)} skills matching '{query}'",
-            "output": "\n".join(output_lines),
+            "summary": (
+                f"Found {len(cloud_skills)} cloud skills matching '{query}'; "
+                f"{len(local_skills)} local skills already in context."
+            ),
+            "output": output,
+            "metrics": {"k": k, "cloud_count": len(cloud_skills)},
             "diagnostics": {
                 "query": query,
-                "results_count": len(all_skills),
-                "local_count": len(local_skills),
-                "cloud_count": len(cloud_skills),
+                "local_in_context": len(local_skills),
             },
         }
         return json.dumps(payload, ensure_ascii=False, default=str)

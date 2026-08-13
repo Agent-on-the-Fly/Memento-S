@@ -55,10 +55,10 @@ class TestAgentRunDir:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_goal_met_with_primary_artifact(self):
+    async def test_goal_met_with_primary_artifact(self, tmp_path):
         """Goal is met when primary artifact exists."""
         config = MagicMock(spec=SkillConfig)
-        workspace = Path("/test/workspace")
+        workspace = tmp_path / "workspace"
         config.workspace_dir = workspace
         agent = SkillAgent(config=config)
 

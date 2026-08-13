@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, AsyncMock
 import tempfile
 import shutil
 
+import pytest
+
 # 添加项目根目录到 path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -16,6 +18,7 @@ from core.skill.execution.artifact_registry import ArtifactRegistry
 from shared.schema import SkillConfig
 
 
+@pytest.mark.asyncio
 async def test_file_create_state_delta():
     """测试 file_create 工具执行后 state_delta 和 state.created_files 的填充。"""
     

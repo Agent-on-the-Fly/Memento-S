@@ -35,6 +35,7 @@ from .history.manager import HistoryManager
 from .pre_api_pipeline import PreApiPipeline
 from infra.memory.impl.session_memory import SessionMemory
 from .session_context import SessionContext
+from .scratchpad import Scratchpad
 from core.prompts.prompt_builder import PromptBuilder
 from core.prompts.templates import (
     AGENT_IDENTITY_OPENING,
@@ -122,6 +123,7 @@ class ContextManager:
 
         # session directory from SessionContext
         self._ctx.session_dir.mkdir(parents=True, exist_ok=True)
+        self._scratchpad = Scratchpad(self._ctx.session_id, self._ctx.date_dir)
 
         # L1 Session Memory (CC-style summary.md)
         self._session_memory = SessionMemory(
@@ -186,6 +188,16 @@ class ContextManager:
     def total_tokens(self) -> int:
         return self._total_tokens
 
+    @property
+    def scratchpad_path(self) -> Path:
+        return self._scratchpad.path
+
+    def write_to_scratchpad(self, title: str, content: str) -> str:
+        return self._scratchpad.write(title, content)
+
+    def _get_context_section(self) -> str:
+        return self._scratchpad.build_reference()
+
     # ═══════════════════════════════════════════════════════════════
     # Token 状态 & Budget
     # ═══════════════════════════════════════════════════════════════
@@ -219,8 +231,6 @@ class ContextManager:
             microcompact_compactable_tools=set(cfg.microcompact_compactable_tools),
             emergency_keep_tail=cfg.emergency_keep_tail,
             max_compact_failures=cfg.max_compact_failures,
-            sm_compact_min_tokens=max(floor, int(context_max_tokens * cfg.sm_compact_min_ratio)),
-            sm_compact_max_tokens=max(floor, int(context_max_tokens * cfg.sm_compact_max_ratio)),
             artifact_store=self._artifact_store,
             session_memory=self._session_memory,
             breaker_cooldown_s=cfg.breaker_cooldown_s,
@@ -252,6 +262,16 @@ class ContextManager:
         result = list(messages) + new_msgs
         added_tokens = count_tokens_messages(new_msgs, model=self._model)
         self._total_tokens += added_tokens
+        if (
+            self._context_max_tokens > 0
+            and self._total_tokens
+            >= self._context_max_tokens * self._cfg.compaction_trigger_ratio
+        ):
+            from .compaction import compact_messages
+
+            result, self._total_tokens = await compact_messages(
+                result, summary_tokens=self._summary_tokens
+            )
         return result
 
     # ═══════════════════════════════════════════════════════════════
@@ -571,6 +591,10 @@ class ContextManager:
                 session_context, current_message
             )
             pb.add(session_section, priority=60, label="session_state")
+
+        scratchpad_section = self._get_context_section()
+        if scratchpad_section:
+            pb.add(scratchpad_section, priority=65, label="scratchpad")
 
         return pb.build()
 

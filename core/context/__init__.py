@@ -19,6 +19,7 @@ from .runtime import RuntimeState, RuntimeStateStore, sync_from_agent_run
 from .session import SessionStatus, SessionGoal, ActionRecord, build_session_context_block
 from .session_context import SessionContext
 from .pre_api_pipeline import PreApiPipeline
+from .scratchpad import Scratchpad
 
 __all__ = [
     "ContextManager",
@@ -31,4 +32,5 @@ __all__ = [
     "build_session_context_block",
     "SessionContext",
     "PreApiPipeline",
+    "Scratchpad",
 ]

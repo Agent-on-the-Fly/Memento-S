@@ -136,7 +136,10 @@ class TestIncrementalMerge:
 
         # execution 来自 system（用户配置不覆盖）
         assert "execution" in merged["skills"]
-        assert merged["skills"]["execution"]["timeout_sec"] == 300
+        assert (
+            merged["skills"]["execution"]["timeout_sec"]
+            == system["skills"]["execution"]["timeout_sec"]
+        )
 
 
 class TestVersionMigration:

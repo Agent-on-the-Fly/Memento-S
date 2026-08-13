@@ -11,6 +11,7 @@ responsibility isolated and testable.
 from __future__ import annotations
 
 import time
+import json
 from typing import Any, Callable
 
 from core.skill.gateway import SkillGateway
@@ -117,6 +118,10 @@ class SkillDispatcher:
         """Return skill tool schemas loaded from tools registry."""
         return self._skill_schemas
 
+    @property
+    def max_evolution_updates_per_step(self) -> int:
+        return max(0, int(self._gateway._config.evolution_max_updates_per_step))
+
     def set_context(self, ctx: Any) -> None:
         """Set SessionContext for this dispatcher (created by agent layer)."""
         self._ctx = ctx
@@ -164,6 +169,59 @@ class SkillDispatcher:
                 result = await self._execution.create_skill(args)
             elif tool_name == TOOL_RECALL_CONTEXT:
                 result = await self._recall.recall(args)
+            elif tool_name == "skill_list":
+                manifests = await self._gateway.discover()
+                verbose = bool(args.get("verbose", False))
+                output = []
+                for manifest in manifests:
+                    item = {
+                        "name": manifest.name,
+                        "description": manifest.description,
+                    }
+                    if verbose:
+                        item.update(
+                            {
+                                "execution_mode": manifest.execution_mode.value,
+                                "parameters": manifest.parameters,
+                                "dependencies": manifest.dependencies,
+                                "governance": manifest.governance.model_dump(mode="json"),
+                            }
+                        )
+                    output.append(item)
+                result = json.dumps(
+                    {"ok": True, "status": "success", "output": output},
+                    ensure_ascii=False,
+                )
+            elif tool_name == "read_skill":
+                skill_name = str(args.get("skill_name", "")).strip()
+                if not skill_name:
+                    result = json.dumps(
+                        {
+                            "ok": False,
+                            "status": "failed",
+                            "error_code": "INVALID_INPUT",
+                            "summary": "skill_name is required for read_skill",
+                        }
+                    )
+                else:
+                    content = await self._gateway.read(skill_name)
+                    result = json.dumps(
+                        {
+                            "ok": content is not None,
+                            "status": "success" if content is not None else "failed",
+                            "error_code": None if content is not None else "SKILL_NOT_FOUND",
+                            "skill_name": skill_name,
+                            "output": content,
+                        },
+                        ensure_ascii=False,
+                    )
+            elif tool_name == "skill_install":
+                result = await self._execution.download_skill(args)
+            elif tool_name == "bash_tool":
+                command = str(args.get("command", ""))
+                if "rm -rf /" in command:
+                    raise PermissionError("dangerous root deletion command denied")
+                raise ValueError("bash_tool is not exposed by SkillDispatcher")
             else:
                 # Hallucination Interceptor: Auto-convert skill name to execute_skill
                 result = await self._hallucination.intercept(
@@ -176,8 +234,37 @@ class SkillDispatcher:
 
         except Exception as e:
             duration = time.monotonic() - start_time
-            import json
-
             error_result = json.dumps({"ok": False, "error": str(e)})
             log_tool_end(tool_name, error_result, duration, success=False)
             raise
+
+    async def evolve_after_failure(
+        self,
+        *,
+        task: str,
+        trace: list[dict[str, Any]],
+        rationale: str,
+    ) -> dict[str, Any]:
+        """Run the gateway's guarded Read-Write update for a failed trace."""
+        used_skills = [
+            str(item.get("skill_name", ""))
+            for item in trace
+            if item.get("skill_name")
+        ]
+        result = await self._gateway.evolve_failure(
+            task=task,
+            used_skills=used_skills,
+            trace=trace,
+            rationale=rationale,
+            session_id=self._ctx.session_id if self._ctx else "",
+        )
+        if result.deployed:
+            self._notify_skills_changed()
+        return result.to_dict()
+
+    def _notify_skills_changed(self) -> None:
+        if self._on_skills_changed is not None:
+            try:
+                self._on_skills_changed()
+            except Exception:
+                logger.opt(exception=True).warning("on_skills_changed callback failed")

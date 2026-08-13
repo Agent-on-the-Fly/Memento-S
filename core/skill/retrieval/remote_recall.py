@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import certifi
 import httpx
+import ssl
 
 from utils.logger import get_logger
 from .base import BaseRecall
@@ -27,23 +28,32 @@ class RemoteRecall(BaseRecall):
     def __init__(self, base_url: str, timeout: float = 10.0) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
-        self._client: httpx.AsyncClient = httpx.AsyncClient(
-            timeout=timeout,
-            verify=certifi.where(),
-            trust_env=False,
-        )
         self._embedding_ready: bool = False
         self._size: int = 0
         self._available: bool = False
+
+    def _make_client(self) -> httpx.AsyncClient:
+        """Create a loop-local client.
+
+        RemoteRecall is used by sync fixtures and async application code. A
+        persistent AsyncClient cannot safely cross those event-loop boundaries.
+        """
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        return httpx.AsyncClient(
+            timeout=self._timeout,
+            verify=ssl_context,
+            trust_env=False,
+        )
 
     async def _health_check(self) -> None:
         """启动时健康检查，填充元数据并设置可用性标记。"""
         import asyncio
         try:
-            resp = await asyncio.wait_for(
-                self._client.get(f"{self._base_url}/health"),
-                timeout=self._timeout,
-            )
+            async with self._make_client() as client:
+                resp = await asyncio.wait_for(
+                    client.get(f"{self._base_url}/health"),
+                    timeout=self._timeout,
+                )
             if resp.status_code == 200:
                 data = resp.json()
                 self._embedding_ready = data.get("embedding_ready", False)
@@ -98,10 +108,11 @@ class RemoteRecall(BaseRecall):
     async def search(self, query: str, k: int = 5, **kwargs) -> list["SkillSearchResult"]:
         """搜索 skill，返回 SkillSearchResult 列表。"""
         try:
-            resp = await self._client.post(
-                f"{self._base_url}/api/v1/search",
-                json={"query": query, "top_k": k},
-            )
+            async with self._make_client() as client:
+                resp = await client.post(
+                    f"{self._base_url}/api/v1/search",
+                    json={"query": query, "top_k": k},
+                )
             if resp.status_code != 200:
                 logger.warning("Remote search failed: HTTP {}", resp.status_code)
                 return []
@@ -136,6 +147,5 @@ class RemoteRecall(BaseRecall):
         return stats
 
     async def close(self) -> None:
-        """关闭 HTTP 客户端连接"""
-        await self._client.aclose()
-
+        """Compatibility no-op; request-local clients close themselves."""
+        return None

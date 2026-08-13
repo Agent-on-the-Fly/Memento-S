@@ -2112,8 +2112,8 @@ class SettingsPanel:
                     key_path = f"skills.{field_name}"
                     add_setting_field(key_path, field_name, field_value)
 
-        # Add retrieval, execution, strategy fields
-        for section in ["retrieval", "execution", "strategy"]:
+        # Add retrieval, execution, evolution, strategy fields
+        for section in ["retrieval", "execution", "evolution", "strategy"]:
             section_obj = getattr(skills_config, section, None)
             if section_obj and hasattr(section_obj, "model_dump"):
                 for field_name, field_value in section_obj.model_dump().items():

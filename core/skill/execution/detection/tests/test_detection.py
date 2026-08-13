@@ -693,7 +693,7 @@ class TestArtifactPreservation:
                 is_significant=True,
             ),
         ]
-        change_set = ChangeSetCompat(
+        change_set = ChangeSet(
             changes=changes,
             tool_name="python_repl",
             execution_id="test-repl-3",

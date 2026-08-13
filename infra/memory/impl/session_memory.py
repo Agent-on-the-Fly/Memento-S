@@ -16,9 +16,9 @@ from utils.token_utils import count_tokens
 
 logger = get_logger(__name__)
 
-SESSION_MEMORY_DIR = ""
+SESSION_MEMORY_DIR = "session_memory"
 SUMMARY_FILE = "summary.md"
-META_FILE = "meta.json"
+META_FILE = ".meta.json"
 MAX_SECTION_TOKENS = 2000
 MAX_TOTAL_TOKENS = 12000
 MAX_WORKLOG_LINES = 50
@@ -60,6 +60,7 @@ class SessionMemory:
         self._dir = session_dir / SESSION_MEMORY_DIR
         self._path = self._dir / SUMMARY_FILE
         self._meta_path = self._dir / META_FILE
+        self._legacy_path = session_dir / SUMMARY_FILE
         self._model = model
         self._llm_update_interval = llm_update_interval
         self._template: str = ""
@@ -108,6 +109,12 @@ class SessionMemory:
         """读取 summary.md 全文 (内存缓存，避免重复磁盘读)。"""
         if self._cached_content is not None:
             return self._cached_content
+        if not self._path.exists() and self._legacy_path.exists():
+            try:
+                self._cached_content = self._legacy_path.read_text(encoding="utf-8")
+                return self._cached_content
+            except OSError:
+                pass
         if not self._path.exists():
             self._cached_content = self._template
             return self._template
